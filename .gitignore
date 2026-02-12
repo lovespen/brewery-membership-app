@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Backend
+backend/dist/
+
+# Expo / React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Prisma
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Optional: uncomment if you don't want lockfiles in the repo
+# package-lock.json

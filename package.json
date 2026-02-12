@@ -1,0 +1,15 @@
+{
+  "name": "brewery-membership-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Brewery membership: backend API, admin dashboard, member web app",
+  "scripts": {
+    "dev": "concurrently -n backend,admin,member -c blue,magenta,green \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:member\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:admin": "cd admin && npm run dev",
+    "dev:member": "cd member-web && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

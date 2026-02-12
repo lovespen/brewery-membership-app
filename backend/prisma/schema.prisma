@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  roles        UserRole[]
+  memberships  Membership[]
+  orders       Order[]
+  entitlements PickupEntitlement[]
+}
+
+model Role {
+  id   String @id @default(uuid())
+  code String @unique // MEMBER, EMPLOYEE, ADMIN, DEVELOPER, SUPERADMIN
+
+  users UserRole[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model Club {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique // SAP, WOOD, CELLARS, FOUNDERS
+  description String?
+
+  memberships         Membership[]
+  membershipOfferings MembershipOffering[]
+  allowedFor          ProductAllowedClub[]
+  promoCodes          ToastClubPromoCode[]
+  productPrices       ProductPrice[]
+}
+
+/// Sale offering for a club+year (name, price, Toast code, sale window). One per club per year.
+model MembershipOffering {
+  id                String   @id @default(uuid())
+  clubId            String
+  year              Int
+  name              String
+  description       String   @default("")
+  saleStartAt       DateTime?
+  saleEndAt         DateTime?
+  capacity          Int      @default(0)
+  soldCount         Int      @default(0)
+  isActive          Boolean  @default(true)
+  priceCents        Int      @default(0)
+  taxRateId         String?
+  toastDiscountCode String
+  /// JSON array of club codes allowed to purchase; empty or null = primary club only
+  allowedClubCodes  Json?    @default("[]")
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, year])
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  clubId    String
+  year      Int      // membership year, e.g. 2026
+  status    String   // ACTIVE, LAPSED, CANCELLED
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  club Club @relation(fields: [clubId], references: [id])
+
+  @@unique([userId, clubId, year])
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  sku         String?  @unique
+  isActive    Boolean  @default(true)
+
+  // Inventory and allocation
+  inventoryQuantity Int      @default(0)
+
+  // Preorder configuration
+  isPreorder       Boolean  @default(false)
+  preorderStartAt  DateTime?
+  preorderEndAt    DateTime?
+  releaseAt        DateTime?
+
+  /// Optional tax rate id from TaxRate table
+  taxRateId    String?
+  currency     String   @default("USD")
+
+  allowedClubs ProductAllowedClub[]
+  prices      ProductPrice[]
+  orderItems  OrderItem[]
+  entitlements PickupEntitlement[]
+}
+
+model ProductAllowedClub {
+  productId String
+  clubId    String
+
+  product Product @relation(fields: [productId], references: [id])
+  club    Club    @relation(fields: [clubId], references: [id])
+
+  @@id([productId, clubId])
+}
+
+model ProductPrice {
+  id        String   @id @default(uuid())
+  productId String
+  clubId    String?  // null = default price for all clubs
+  priceCents Int
+  currency  String   @default("USD")
+
+  product Product @relation(fields: [productId], references: [id])
+  club    Club?   @relation(fields: [clubId], references: [id])
+
+  @@unique([productId, clubId])
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  userId    String
+  createdAt DateTime @default(now())
+  status    String   // PENDING, PAID, CANCELLED, REFUNDED
+  totalCents Int
+  currency  String   @default("USD")
+
+  user   User        @relation(fields: [userId], references: [id])
+  items  OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPriceCents Int
+  status    String   // PREORDER, READY_FOR_PICKUP, FULFILLED, CANCELLED
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model PickupEntitlement {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  quantity  Int
+  status    String   // NOT_READY, READY_FOR_PICKUP, PICKED_UP, EXPIRED
+  source    String   // ALLOCATION, PREORDER, ORDER
+  releaseAt DateTime?
+  pickedUpAt DateTime?
+  pickedUpByUserId String?
+
+  user        User    @relation(fields: [userId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+}
+
+model FeeConfig {
+  id                      String   @id @default(uuid())
+  developerFeePercent     Float
+  developerConnectAccountId String?
+  effectiveFrom           DateTime
+  effectiveTo             DateTime?
+  createdAt               DateTime @default(now())
+  createdByUserId         String?
+}
+
+/// Key-value app config (membershipYear, stripe, tipPercentages, etc.)
+model Config {
+  key   String @id
+  value Json
+}
+
+model TaxRate {
+  id          String @id @default(uuid())
+  name        String
+  ratePercent Float
+}
+
+model ToastClubPromoCode {
+  id          String   @id @default(uuid())
+  clubId      String
+  promoCode   String
+  description String?
+  isActive    Boolean  @default(true)
+
+  club Club @relation(fields: [clubId], references: [id])
+}
+
