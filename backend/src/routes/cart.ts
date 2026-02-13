@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 
 type CartItem = { productId: string; quantity: number };
 
@@ -13,9 +14,9 @@ function getSessionId(req: Request): string {
   return `cart_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function registerCartRoutes(app: Express) {
+export function registerCartRoutes(router: IRouter) {
   // GET /api/cart - get cart for session (optional X-Cart-Session header or ?cartSessionId=)
-  app.get("/api/cart", (req: Request, res: Response) => {
+  router.get("/cart", (req: Request, res: Response) => {
     const sessionId = (req.query.cartSessionId as string) || getSessionId(req);
     if (!carts.has(sessionId)) {
       carts.set(sessionId, []);
@@ -25,7 +26,7 @@ export function registerCartRoutes(app: Express) {
   });
 
   // POST /api/cart/items - add or update item (body: cartSessionId?, productId, quantity)
-  app.post("/api/cart/items", (req: Request, res: Response) => {
+  router.post("/cart/items", (req: Request, res: Response) => {
     const sessionId = getSessionId(req);
     const { productId, quantity } = req.body;
     if (!productId || typeof productId !== "string") {
@@ -47,7 +48,7 @@ export function registerCartRoutes(app: Express) {
   });
 
   // DELETE /api/cart/items/:productId
-  app.delete("/api/cart/items/:productId", (req: Request, res: Response) => {
+  router.delete("/cart/items/:productId", (req: Request, res: Response) => {
     const sessionId = getSessionId(req);
     const { productId } = req.params;
     if (!carts.has(sessionId)) {
@@ -60,7 +61,7 @@ export function registerCartRoutes(app: Express) {
   });
 
   // POST /api/cart/clear - clear cart
-  app.post("/api/cart/clear", (req: Request, res: Response) => {
+  router.post("/cart/clear", (req: Request, res: Response) => {
     const sessionId = getSessionId(req);
     carts.set(sessionId, []);
     res.json({ cartSessionId: sessionId, items: [] });

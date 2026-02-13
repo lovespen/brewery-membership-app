@@ -1,10 +1,11 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import { getSalesTaxRecordsByMonth } from "../stores/salesTaxRecords";
 import { getTaxRateById } from "./config";
 
-export function registerReportRoutes(app: Express) {
+export function registerReportRoutes(router: IRouter) {
   // GET /api/reports/sales-tax?month=YYYY-MM - monthly sales tax summary for reporting
-  app.get("/api/reports/sales-tax", (req: Request, res: Response) => {
+  router.get("/reports/sales-tax", (req: Request, res: Response) => {
     const month = (req.query.month as string) || "";
     const match = /^\d{4}-\d{2}$/.exec(month);
     if (!match) {

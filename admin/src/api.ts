@@ -1,13 +1,10 @@
 /**
- * API base URL. In production set VITE_API_BASE (e.g. https://api.yourbrewery.com).
- * Defaults to same host as the admin app on port 4000, or localhost:4000 in dev.
+ * API base URL. Must set VITE_API_BASE when building for production (e.g. Vercel).
+ * In dev, defaults to http://localhost:4000.
  */
 export function getApiBase(): string {
   const env = (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
-  if (env) return env.replace(/\/$/, "");
-  if (typeof window !== "undefined" && window.location?.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    return `${window.location.protocol}//${window.location.hostname}:4000`;
-  }
+  if (env && env.trim()) return env.trim().replace(/\/$/, "");
   return "http://localhost:4000";
 }
 

@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import type { ClubCode } from "./products";
 import { getActiveMembershipYear } from "./config";
 import { getClubByCode } from "./clubs";
@@ -95,9 +96,9 @@ export function requireAdmin(req: Request, res: Response, next: (err?: unknown) 
   })();
 }
 
-export function registerAuthRoutes(app: Express) {
+export function registerAuthRoutes(router: IRouter) {
   // POST /api/auth/login - log in with email and password
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  router.post("/auth/login", async (req: Request, res: Response) => {
     const { email, password } = req.body;
     if (!email || typeof email !== "string" || !email.trim()) {
       return res.status(400).json({ error: "Email is required" });
@@ -150,7 +151,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // GET /api/auth/me - current member from token
-  app.get("/api/auth/me", async (req: Request, res: Response) => {
+  router.get("/auth/me", async (req: Request, res: Response) => {
     const token = getAuthToken(req);
     if (!token) {
       return res.status(401).json({ error: "Not logged in" });
@@ -195,14 +196,14 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // POST /api/auth/logout - invalidate token (client should discard token)
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  router.post("/auth/logout", (req: Request, res: Response) => {
     const token = getAuthToken(req);
     if (token) tokenStore.delete(token);
     res.json({ ok: true });
   });
 
   // POST /api/auth/change-password - change password (requires Bearer token)
-  app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+  router.post("/auth/change-password", async (req: Request, res: Response) => {
     const token = getAuthToken(req);
     if (!token) {
       return res.status(401).json({ error: "Not logged in" });

@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type IRouter } from "express";
 import cors from "cors";
 import helmet from "helmet";
 
@@ -30,33 +30,46 @@ app.use(cors());
 app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), handleStripeWebhook);
 app.use(express.json());
 
-app.get("/api/health", (_req, res) => {
+// Single API router mounted at /api so path matching is consistent (req.path is relative inside router)
+const apiRouter: IRouter = express.Router();
+
+apiRouter.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Register auth routes first so login/register/etc. are matched before the /api admin gate
-registerAuthRoutes(app);
-
-// Require admin (Bearer token with email in ADMIN_EMAILS) for all other /api/* routes
-app.use("/api", (req, res, next) => {
+// Public routes and admin gate: paths here are relative to /api (e.g. /auth/login, /register)
+apiRouter.use((req, res, next) => {
   if (isPublicApiRoute(req.method, req.path)) return next();
   requireAdmin(req, res, next);
 });
 
-registerClubRoutes(app);
-registerProductRoutes(app);
-registerMemberRoutes(app);
-registerMembershipRoutes(app);
-registerConfigRoutes(app);
-registerAllocationRoutes(app);
-registerCartRoutes(app);
-registerCheckoutRoutes(app);
-registerUserRoutes(app);
-registerUserMembershipRoutes(app);
-registerTipRoutes(app);
-registerNotificationRoutes(app);
-registerPickupRoutes(app);
-registerReportRoutes(app);
+registerAuthRoutes(apiRouter);
+registerClubRoutes(apiRouter);
+registerProductRoutes(apiRouter);
+registerMemberRoutes(apiRouter);
+registerMembershipRoutes(apiRouter);
+registerConfigRoutes(apiRouter);
+registerAllocationRoutes(apiRouter);
+registerCartRoutes(apiRouter);
+registerCheckoutRoutes(apiRouter);
+registerUserRoutes(apiRouter);
+registerUserMembershipRoutes(apiRouter);
+registerTipRoutes(apiRouter);
+registerNotificationRoutes(apiRouter);
+registerPickupRoutes(apiRouter, app);
+registerReportRoutes(apiRouter);
+
+// 404 for /api/* so we can see what path was received (helps debug proxy/404 issues)
+apiRouter.use((req, res) => {
+  res.status(404).json({
+    error: "Not found",
+    method: req.method,
+    path: req.path,
+    url: req.originalUrl
+  });
+});
+
+app.use("/api", apiRouter);
 
 const port = process.env.PORT || 4000;
 ensureDevUser()

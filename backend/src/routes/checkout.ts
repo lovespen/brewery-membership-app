@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import Stripe from "stripe";
 import type { ClubCode } from "./products";
 import { getClubCodes } from "./clubs";
@@ -40,10 +41,10 @@ function computeCartTotal(
   };
 }
 
-export function registerCheckoutRoutes(app: Express) {
+export function registerCheckoutRoutes(router: IRouter) {
   // POST /api/checkout/create-payment-intent
   // Body: { cartSessionId?, items: { productId, quantity }[], membershipId?, memberClubCode? }
-  app.post("/api/checkout/create-payment-intent", async (req: Request, res: Response) => {
+  router.post("/checkout/create-payment-intent", async (req: Request, res: Response) => {
     const secretKey = getStripeSecretKey();
     const publishableKey = getStripePublishableKey();
     if (!secretKey || !publishableKey) {

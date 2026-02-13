@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 
 export type TaxRate = {
   id: string;
@@ -69,9 +70,9 @@ export function getActiveMembershipYear(): number {
   return activeMembershipYear;
 }
 
-export function registerConfigRoutes(app: Express) {
+export function registerConfigRoutes(router: IRouter) {
   // GET /api/config/stripe - Stripe integration settings (admin + developer). Never returns secret key.
-  app.get("/api/config/stripe", (_req: Request, res: Response) => {
+  router.get("/config/stripe", (_req: Request, res: Response) => {
     res.json({
       enabled: stripeConfig.enabled,
       publishableKey: stripeConfig.publishableKey,
@@ -82,7 +83,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   // PUT /api/config/stripe - update Stripe integration (admin + developer)
-  app.put("/api/config/stripe", (req: Request, res: Response) => {
+  router.put("/config/stripe", (req: Request, res: Response) => {
     const { enabled, publishableKey, secretKey, webhookSecret, achDefaultThresholdCents } = req.body;
     if (typeof enabled === "boolean") stripeConfig.enabled = enabled;
     if (typeof publishableKey === "string") {
@@ -109,12 +110,12 @@ export function registerConfigRoutes(app: Express) {
   });
 
   // GET /api/config/tax-rates - list tax rates (admin + developer)
-  app.get("/api/config/tax-rates", (_req: Request, res: Response) => {
+  router.get("/config/tax-rates", (_req: Request, res: Response) => {
     res.json([...taxRates]);
   });
 
   // POST /api/config/tax-rates - add tax rate (admin + developer)
-  app.post("/api/config/tax-rates", (req: Request, res: Response) => {
+  router.post("/config/tax-rates", (req: Request, res: Response) => {
     const { name, ratePercent } = req.body;
     if (!name || typeof name !== "string" || name.trim() === "") {
       return res.status(400).json({ error: "name is required" });
@@ -133,7 +134,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   // DELETE /api/config/tax-rates/:id - remove tax rate (admin + developer)
-  app.delete("/api/config/tax-rates/:id", (req: Request, res: Response) => {
+  router.delete("/config/tax-rates/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const idx = taxRates.findIndex((t) => t.id === id);
     if (idx === -1) {
@@ -143,11 +144,11 @@ export function registerConfigRoutes(app: Express) {
     res.status(204).send();
   });
 
-  app.get("/api/config/membership-year", (_req: Request, res: Response) => {
+  router.get("/config/membership-year", (_req: Request, res: Response) => {
     res.json({ membershipYear: activeMembershipYear });
   });
 
-  app.put("/api/config/membership-year", (req: Request, res: Response) => {
+  router.put("/config/membership-year", (req: Request, res: Response) => {
     const { membershipYear } = req.body as { membershipYear?: number };
     if (typeof membershipYear === "number" && membershipYear >= 2020 && membershipYear <= 2030) {
       activeMembershipYear = Math.floor(membershipYear);
@@ -158,11 +159,11 @@ export function registerConfigRoutes(app: Express) {
   // Suggested tip percentages shown in checkout (e.g. [0, 10, 15, 20, 25])
   let suggestedTipPercents: number[] = [0, 10, 15, 20, 25];
 
-  app.get("/api/config/tip-percentages", (_req: Request, res: Response) => {
+  router.get("/config/tip-percentages", (_req: Request, res: Response) => {
     res.json({ suggestedTipPercents: [...suggestedTipPercents] });
   });
 
-  app.put("/api/config/tip-percentages", (req: Request, res: Response) => {
+  router.put("/config/tip-percentages", (req: Request, res: Response) => {
     const { suggestedTipPercents: body } = req.body as { suggestedTipPercents?: number[] };
     if (!Array.isArray(body)) {
       return res.status(400).json({ error: "suggestedTipPercents must be an array of numbers" });
@@ -185,7 +186,7 @@ export function registerConfigRoutes(app: Express) {
   };
 
   // GET /api/config/fees - current developer fee configuration (developer only / own account)
-  app.get("/api/config/fees", (_req: Request, res: Response) => {
+  router.get("/config/fees", (_req: Request, res: Response) => {
     res.json({
       developerFeePercent: feeConfig.developerFeePercent,
       developerConnectAccountId: feeConfig.developerConnectAccountId
@@ -193,7 +194,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   // PUT /api/config/fees - update developer fee (developer only; sets % and account to receive it)
-  app.put("/api/config/fees", (req: Request, res: Response) => {
+  router.put("/config/fees", (req: Request, res: Response) => {
     const { developerFeePercent, developerConnectAccountId } = req.body;
     if (typeof developerFeePercent === "number" && developerFeePercent >= 0 && developerFeePercent <= 100) {
       feeConfig.developerFeePercent = Math.round(developerFeePercent * 10) / 10;
@@ -211,8 +212,8 @@ export function registerConfigRoutes(app: Express) {
   });
 
   // GET /api/config/toast-promo-codes - club → promo-code mappings
-  app.get(
-    "/api/config/toast-promo-codes",
+  router.get(
+    "/config/toast-promo-codes",
     async (_req: Request, res: Response) => {
       // TODO: fetch from toast_club_promo_codes table
       res.json([]);
@@ -220,8 +221,8 @@ export function registerConfigRoutes(app: Express) {
   );
 
   // POST /api/config/toast-promo-codes - create/update promo-code mapping (admin)
-  app.post(
-    "/api/config/toast-promo-codes",
+  router.post(
+    "/config/toast-promo-codes",
     async (req: Request, res: Response) => {
       const { clubId, promoCode, description, isActive } = req.body;
       // TODO: validate and upsert promo-code mapping

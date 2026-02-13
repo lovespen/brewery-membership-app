@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import type { ClubCode } from "./products";
 import { getClubCodes } from "./clubs";
 import { getProductById, decrementProductInventory } from "./products";
@@ -30,9 +31,9 @@ function addOrderedNotPickedUp(productId: string, quantity: number) {
   if (p) p.orderedNotPickedUpCount += quantity;
 }
 
-export function registerAllocationRoutes(app: Express) {
+export function registerAllocationRoutes(router: IRouter) {
   // GET /api/products/:productId/allocations - list allocations for a product
-  app.get("/api/products/:productId/allocations", (req: Request, res: Response) => {
+  router.get("/products/:productId/allocations", (req: Request, res: Response) => {
     const { productId } = req.params;
     const product = getProductById(productId);
     if (!product) {
@@ -44,7 +45,7 @@ export function registerAllocationRoutes(app: Express) {
 
   // POST /api/products/:productId/allocations - create allocation (admin)
   // Body: { quantityPerPerson, targetType: 'club'|'members', clubCode?, memberIds?, pullFromInventory: boolean }
-  app.post("/api/products/:productId/allocations", async (req: Request, res: Response) => {
+  router.post("/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
     const product = getProductById(productId);
     if (!product) {

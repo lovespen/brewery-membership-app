@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import webpush from "web-push";
 import { getClubCodes } from "./clubs";
 
@@ -108,17 +109,17 @@ function runScheduledCheck() {
 const SCHEDULE_CHECK_MS = 60 * 1000;
 let scheduleInterval: ReturnType<typeof setInterval> | null = null;
 
-export function registerNotificationRoutes(app: Express) {
+export function registerNotificationRoutes(router: IRouter) {
   if (!scheduleInterval) {
     scheduleInterval = setInterval(runScheduledCheck, SCHEDULE_CHECK_MS);
   }
   // GET /api/push/vapid-public-key - client uses this to subscribe
-  app.get("/api/push/vapid-public-key", (_req: Request, res: Response) => {
+  router.get("/push/vapid-public-key", (_req: Request, res: Response) => {
     res.json({ publicKey: vapidPublicKey });
   });
 
   // POST /api/push-subscriptions - register a push subscription (from member app)
-  app.post("/api/push-subscriptions", async (req: Request, res: Response) => {
+  router.post("/push-subscriptions", async (req: Request, res: Response) => {
     const { subscription, clubCodes: clubCodesBody } = req.body;
 
     if (!subscription || typeof subscription !== "object" || !subscription.endpoint) {
@@ -162,7 +163,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // GET /api/notifications - list notifications (sent and scheduled)
-  app.get("/api/notifications", (_req: Request, res: Response) => {
+  router.get("/notifications", (_req: Request, res: Response) => {
     res.json(
       [...notifications].sort((a, b) => {
         const aTime = a.status === "scheduled" && a.scheduledFor
@@ -177,7 +178,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // DELETE /api/notifications/:id - cancel a scheduled notification
-  app.delete("/api/notifications/:id", (req: Request, res: Response) => {
+  router.delete("/notifications/:id", (req: Request, res: Response) => {
     const n = notifications.find((x) => x.id === req.params.id);
     if (!n) {
       return res.status(404).json({ error: "Notification not found" });
@@ -191,7 +192,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // POST /api/notifications - create/send now or schedule a push notification
-  app.post("/api/notifications", async (req: Request, res: Response) => {
+  router.post("/notifications", async (req: Request, res: Response) => {
     const { title, body, clubCodes: clubCodesBody, scheduledFor: scheduledForBody } = req.body;
 
     const titleStr =

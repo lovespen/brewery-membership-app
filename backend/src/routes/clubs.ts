@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import { prisma } from "../db";
 
 export type Club = {
@@ -48,15 +49,15 @@ export async function getClubByCode(code: string): Promise<Club | undefined> {
   };
 }
 
-export function registerClubRoutes(app: Express) {
+export function registerClubRoutes(router: IRouter) {
   // GET /api/clubs - list clubs
-  app.get("/api/clubs", async (_req: Request, res: Response) => {
+  router.get("/clubs", async (_req: Request, res: Response) => {
     const clubs = await getClubs();
     res.json(clubs);
   });
 
   // GET /api/clubs/:id - get one club
-  app.get("/api/clubs/:id", async (req: Request, res: Response) => {
+  router.get("/clubs/:id", async (req: Request, res: Response) => {
     const club = await getClubById(req.params.id);
     if (!club) {
       return res.status(404).json({ error: "Club not found" });
@@ -65,7 +66,7 @@ export function registerClubRoutes(app: Express) {
   });
 
   // POST /api/clubs - create club (admin)
-  app.post("/api/clubs", async (req: Request, res: Response) => {
+  router.post("/clubs", async (req: Request, res: Response) => {
     const { name, code, description } = req.body;
     const rawCode = (code || "").toString().trim().toUpperCase().replace(/\s+/g, "_");
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -94,7 +95,7 @@ export function registerClubRoutes(app: Express) {
   });
 
   // PATCH /api/clubs/:id - update club (admin)
-  app.patch("/api/clubs/:id", async (req: Request, res: Response) => {
+  router.patch("/clubs/:id", async (req: Request, res: Response) => {
     const club = await getClubById(req.params.id);
     if (!club) {
       return res.status(404).json({ error: "Club not found" });

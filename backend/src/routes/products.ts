@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import { getClubCodes } from "./clubs";
 
 /** Club code string; valid values come from GET /api/clubs (admin-defined). */
@@ -80,10 +81,10 @@ export function decrementProductInventory(productId: string, amount: number): bo
   return true;
 }
 
-export function registerProductRoutes(app: Express) {
+export function registerProductRoutes(router: IRouter) {
   // GET /api/products - list products (optionally filtered by club)
   // For shop (includeInactive=false): preorder products only appear when within preorder window.
-  app.get("/api/products", async (req: Request, res: Response) => {
+  router.get("/products", async (req: Request, res: Response) => {
     const clubCode = (req.query.clubCode as string | undefined)?.toUpperCase() as
       | ClubCode
       | undefined;
@@ -119,7 +120,7 @@ export function registerProductRoutes(app: Express) {
   });
 
   // POST /api/products - create product with allowed clubs and pricing (admin)
-  app.post("/api/products", (req: Request, res: Response) => {
+  router.post("/products", (req: Request, res: Response) => {
     const {
       name,
       description,
@@ -198,7 +199,7 @@ export function registerProductRoutes(app: Express) {
   });
 
   // GET /api/products/:id - get single product (for editing)
-  app.get("/api/products/:id", (req: Request, res: Response) => {
+  router.get("/products/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const product = products.find((p) => p.id === id);
     if (!product) {
@@ -208,7 +209,7 @@ export function registerProductRoutes(app: Express) {
   });
 
   // PATCH /api/products/:id - update product (inventory, sale status, or full edit)
-  app.patch("/api/products/:id", (req: Request, res: Response) => {
+  router.patch("/products/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const product = products.find((p) => p.id === id);
     if (!product) {
@@ -296,7 +297,7 @@ export function registerProductRoutes(app: Express) {
   });
 
   // DELETE /api/products/:id - remove product completely
-  app.delete("/api/products/:id", (req: Request, res: Response) => {
+  router.delete("/products/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const idx = products.findIndex((p) => p.id === id);
     if (idx === -1) {
@@ -307,7 +308,7 @@ export function registerProductRoutes(app: Express) {
   });
 
   // GET /api/products/:id/pricing - view per-club pricing for a product
-  app.get("/api/products/:id/pricing", (req: Request, res: Response) => {
+  router.get("/products/:id/pricing", (req: Request, res: Response) => {
     const { id } = req.params;
     const product = products.find((p) => p.id === id);
     if (!product) {

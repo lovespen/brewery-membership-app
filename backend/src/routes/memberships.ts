@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import { prisma } from "../db";
 import { getClubByCode, getClubCodes } from "./clubs";
 
@@ -80,8 +81,8 @@ export async function getMembershipByClubAndYear(
   return o ? toOffering(o) : undefined;
 }
 
-export function registerMembershipRoutes(app: Express) {
-  app.get("/api/memberships", async (_req: Request, res: Response) => {
+export function registerMembershipRoutes(router: IRouter) {
+  router.get("/memberships", async (_req: Request, res: Response) => {
     const list = await prisma.membershipOffering.findMany({
       include: { club: true },
       orderBy: [{ club: { code: "asc" } }, { year: "desc" }]
@@ -89,7 +90,7 @@ export function registerMembershipRoutes(app: Express) {
     res.json(list.map(toOffering));
   });
 
-  app.get("/api/memberships/:id", async (req: Request, res: Response) => {
+  router.get("/memberships/:id", async (req: Request, res: Response) => {
     const offering = await getMembershipById(req.params.id);
     if (!offering) {
       return res.status(404).json({ error: "Membership offering not found" });
@@ -97,7 +98,7 @@ export function registerMembershipRoutes(app: Express) {
     res.json(offering);
   });
 
-  app.patch("/api/memberships/:id", async (req: Request, res: Response) => {
+  router.patch("/memberships/:id", async (req: Request, res: Response) => {
     const existing = await prisma.membershipOffering.findUnique({
       where: { id: req.params.id },
       include: { club: true }
@@ -178,7 +179,7 @@ export function registerMembershipRoutes(app: Express) {
     res.json(toOffering(updated));
   });
 
-  app.post("/api/memberships", async (req: Request, res: Response) => {
+  router.post("/memberships", async (req: Request, res: Response) => {
     const {
       clubCode,
       name,

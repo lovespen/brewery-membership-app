@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { type Express, Request, Response } from "express";
 import {
   getAllEntitlements,
   getEntitlementById,
@@ -32,9 +33,9 @@ async function resolveDisplayName(userId: string): Promise<{ name: string | null
   return { name: null, email: null };
 }
 
-export function registerPickupRoutes(app: Express) {
+export function registerPickupRoutes(router: IRouter, app: Express) {
   // GET /api/pickups - list entitlements ready for pickup or already picked up (for admin)
-  app.get("/api/pickups", async (_req: Request, res: Response) => {
+  router.get("/pickups", async (_req: Request, res: Response) => {
     promotePreordersToReady();
     const all = getAllEntitlements();
     const relevant = all.filter(
@@ -63,7 +64,7 @@ export function registerPickupRoutes(app: Express) {
   });
 
   // GET /api/pickups/by-member/:memberId - pickups for one member (for staff scan page)
-  app.get("/api/pickups/by-member/:memberId", async (req: Request, res: Response) => {
+  router.get("/pickups/by-member/:memberId", async (req: Request, res: Response) => {
     promotePreordersToReady();
     const { memberId } = req.params;
     const memberFromList = getMemberById(memberId);
@@ -95,7 +96,7 @@ export function registerPickupRoutes(app: Express) {
   });
 
   // PATCH /api/pickups/:id - mark as picked up or not (body: { pickedUp: boolean })
-  app.patch("/api/pickups/:id", (req: Request, res: Response) => {
+  router.patch("/pickups/:id", (req: Request, res: Response) => {
     const { id } = req.params;
     const { pickedUp } = req.body as { pickedUp?: boolean };
     const ent = getEntitlementById(id);

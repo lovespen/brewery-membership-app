@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import type { ClubCode } from "./products";
 import { getClubCodes } from "./clubs";
 import { getEntitlementsByMemberId, getEntitlementById, markEntitlementPickedUp, promotePreordersToReady } from "../stores/entitlements";
@@ -29,9 +30,9 @@ export function getMemberIdsExist(ids: string[]): boolean {
   return ids.every((id) => set.has(id));
 }
 
-export function registerMemberRoutes(app: Express) {
+export function registerMemberRoutes(router: IRouter) {
   // GET /api/members - list members (optional ?clubCode= for filter)
-  app.get("/api/members", async (req: Request, res: Response) => {
+  router.get("/members", async (req: Request, res: Response) => {
     const validCodes = await getClubCodes();
     const clubCode = (req.query.clubCode as string | undefined)?.trim().toUpperCase() as ClubCode | undefined;
     let list = [...members];
@@ -42,8 +43,8 @@ export function registerMemberRoutes(app: Express) {
   });
 
   // GET /api/members/:id/entitlements - pickup + preorder entitlements for member
-  app.get(
-    "/api/members/:id/entitlements",
+  router.get(
+    "/members/:id/entitlements",
     async (req: Request, res: Response) => {
       promotePreordersToReady();
       const { id } = req.params;
@@ -59,8 +60,8 @@ export function registerMemberRoutes(app: Express) {
   );
 
   // POST /api/members/:id/pickups/fulfill - employee marks items picked up
-  app.post(
-    "/api/members/:id/pickups/fulfill",
+  router.post(
+    "/members/:id/pickups/fulfill",
     async (req: Request, res: Response) => {
       const { id } = req.params;
       const { entitlementIds } = req.body as { entitlementIds?: string[] };

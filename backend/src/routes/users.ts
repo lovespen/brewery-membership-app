@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import { prisma } from "../db";
 
 const SALT_ROUNDS = 10;
@@ -83,9 +84,9 @@ export async function setUserPasswordHash(userId: string, passwordHash: string):
   });
 }
 
-export function registerUserRoutes(app: Express) {
+export function registerUserRoutes(router: IRouter) {
   // POST /api/register - create account (public); firstName, lastName, password required
-  app.post("/api/register", async (req: Request, res: Response) => {
+  router.post("/register", async (req: Request, res: Response) => {
     const { email, firstName, lastName, password } = req.body;
     if (!email || typeof email !== "string" || !email.trim()) {
       return res.status(400).json({ error: "Email is required" });
@@ -118,7 +119,7 @@ export function registerUserRoutes(app: Express) {
   });
 
   // GET /api/users - list accounts (admin/dev); never expose passwordHash
-  app.get("/api/users", async (_req: Request, res: Response) => {
+  router.get("/users", async (_req: Request, res: Response) => {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "asc" },
       select: { id: true, email: true, name: true, createdAt: true }

@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 import type { ClubCode } from "./products";
 import { getClubByCode, getClubCodes } from "./clubs";
 import { getMembershipByClubAndYear } from "./memberships";
@@ -32,9 +33,9 @@ export async function getMembershipRecordsByUserId(
   }));
 }
 
-export function registerUserMembershipRoutes(app: Express) {
+export function registerUserMembershipRoutes(router: IRouter) {
   // GET /api/user-memberships - list (optional ?userId=). Returns records with user email/name.
-  app.get("/api/user-memberships", async (req: Request, res: Response) => {
+  router.get("/user-memberships", async (req: Request, res: Response) => {
     const userId = req.query.userId as string | undefined;
     const memberships = await prisma.membership.findMany({
       where: userId ? { userId } : undefined,
@@ -61,7 +62,7 @@ export function registerUserMembershipRoutes(app: Express) {
   });
 
   // POST /api/user-memberships - add membership to an account (admin/dev)
-  app.post("/api/user-memberships", async (req: Request, res: Response) => {
+  router.post("/user-memberships", async (req: Request, res: Response) => {
     const { userId: userIdOrEmail, clubCode, year } = req.body;
     if (!userIdOrEmail || typeof userIdOrEmail !== "string") {
       return res.status(400).json({ error: "userId is required" });
@@ -115,7 +116,7 @@ export function registerUserMembershipRoutes(app: Express) {
   });
 
   // PATCH /api/user-memberships/:id - transfer to another user (admin/dev)
-  app.patch("/api/user-memberships/:id", async (req: Request, res: Response) => {
+  router.patch("/user-memberships/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { userId: newUserId } = req.body;
     const rec = await prisma.membership.findUnique({ where: { id }, include: { club: true } });
@@ -157,7 +158,7 @@ export function registerUserMembershipRoutes(app: Express) {
   });
 
   // DELETE /api/user-memberships/:id - remove membership from account (admin/dev)
-  app.delete("/api/user-memberships/:id", async (req: Request, res: Response) => {
+  router.delete("/user-memberships/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const rec = await prisma.membership.findUnique({ where: { id } });
     if (!rec) {
@@ -168,7 +169,7 @@ export function registerUserMembershipRoutes(app: Express) {
   });
 
   // GET /api/users/export-csv - export all members and their memberships as CSV (admin/dev)
-  app.get("/api/users/export-csv", async (_req: Request, res: Response) => {
+  router.get("/users/export-csv", async (_req: Request, res: Response) => {
     const allUsers = await getAllUsers();
     const allMemberships = await prisma.membership.findMany({
       include: { club: true },

@@ -1,4 +1,5 @@
-import { Express, Request, Response } from "express";
+import type { IRouter } from "express";
+import { Request, Response } from "express";
 
 let availableTipCents = 0;
 
@@ -26,9 +27,9 @@ export function getAvailableTipCents(): number {
   return availableTipCents;
 }
 
-export function registerTipRoutes(app: Express) {
+export function registerTipRoutes(router: IRouter) {
   // GET /api/tips - balance and withdrawal history (managers)
-  app.get("/api/tips", (_req: Request, res: Response) => {
+  router.get("/tips", (_req: Request, res: Response) => {
     res.json({
       availableCents: availableTipCents,
       withdrawals: [...withdrawals].sort(
@@ -38,7 +39,7 @@ export function registerTipRoutes(app: Express) {
   });
 
   // POST /api/tips/withdraw - pull tips out (managers)
-  app.post("/api/tips/withdraw", (req: Request, res: Response) => {
+  router.post("/tips/withdraw", (req: Request, res: Response) => {
     const { amountCents, note } = req.body;
     const amount = typeof amountCents === "number" ? Math.floor(amountCents) : Math.floor(Number(amountCents) || 0);
     if (amount <= 0) {
