@@ -21,6 +21,7 @@ import { registerPickupRoutes } from "./routes/pickups";
 import { registerReportRoutes } from "./routes/reports";
 import { handleStripeWebhook } from "./routes/webhooks";
 import { ensureDevUser } from "./routes/users";
+import { ensureDefaultClubs } from "./routes/clubs";
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use("/api", apiRouter);
 
 const port = process.env.PORT || 4000;
 ensureDevUser()
+  .then(() => ensureDefaultClubs().then(() => {}))
   .then(() => {
     app.listen(port, () => {
       // eslint-disable-next-line no-console

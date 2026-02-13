@@ -3,10 +3,14 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import QRCode from "qrcode";
 
-/** API base URL. In dev, "" uses Vite proxy to localhost:4000. In production set VITE_API_BASE (e.g. https://api.yourbrewery.com). */
+/** API base URL. In dev, "" uses Vite proxy. In production set VITE_API_BASE to full URL (e.g. https://your-backend.up.railway.app). */
 function getApiBase(): string {
   const env = typeof import.meta !== "undefined" && (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
-  if (env) return env.replace(/\/$/, "");
+  if (env && env.trim()) {
+    let base = env.trim().replace(/\/$/, "");
+    if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+    return base;
+  }
   return "";
 }
 const API = getApiBase();

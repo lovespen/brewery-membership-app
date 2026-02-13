@@ -1,5 +1,6 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
+import { requireDeveloper } from "./auth";
 
 export type TaxRate = {
   id: string;
@@ -185,8 +186,8 @@ export function registerConfigRoutes(router: IRouter) {
     developerConnectAccountId: null
   };
 
-  // GET /api/config/fees - current developer fee configuration (developer only / own account)
-  router.get("/config/fees", (_req: Request, res: Response) => {
+  // GET /api/config/fees - current developer fee configuration (developer only)
+  router.get("/config/fees", requireDeveloper, (_req: Request, res: Response) => {
     res.json({
       developerFeePercent: feeConfig.developerFeePercent,
       developerConnectAccountId: feeConfig.developerConnectAccountId
@@ -194,7 +195,7 @@ export function registerConfigRoutes(router: IRouter) {
   });
 
   // PUT /api/config/fees - update developer fee (developer only; sets % and account to receive it)
-  router.put("/config/fees", (req: Request, res: Response) => {
+  router.put("/config/fees", requireDeveloper, (req: Request, res: Response) => {
     const { developerFeePercent, developerConnectAccountId } = req.body;
     if (typeof developerFeePercent === "number" && developerFeePercent >= 0 && developerFeePercent <= 100) {
       feeConfig.developerFeePercent = Math.round(developerFeePercent * 10) / 10;

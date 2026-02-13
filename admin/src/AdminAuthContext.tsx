@@ -4,6 +4,7 @@ import { getApiBase, getStoredToken, setStoredToken } from "./api";
 type AdminAuthContextValue = {
   token: string | null;
   isAdmin: boolean;
+  isDeveloper: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
   logout: () => void;
@@ -15,6 +16,7 @@ const AdminAuthContext = createContext<AdminAuthContextValue | null>(null);
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDeveloper, setIsDeveloper] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const apiBase = getApiBase();
@@ -24,6 +26,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     if (!stored) {
       setToken(null);
       setIsAdmin(false);
+      setIsDeveloper(false);
       setLoading(false);
       return;
     }
@@ -36,19 +39,23 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         if (data.isAdmin) {
           setToken(stored);
           setIsAdmin(true);
+          setIsDeveloper(Boolean((data as { isDeveloper?: boolean }).isDeveloper));
         } else {
           setStoredToken(null);
           setToken(null);
           setIsAdmin(false);
+          setIsDeveloper(false);
         }
       } else {
         setStoredToken(null);
         setToken(null);
         setIsAdmin(false);
+        setIsDeveloper(false);
       }
     } catch {
       setToken(null);
       setIsAdmin(false);
+      setIsDeveloper(false);
     } finally {
       setLoading(false);
     }
@@ -75,9 +82,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         const admin = (data as { isAdmin?: boolean }).isAdmin;
         if (!t) return { error: "No token received" };
         if (!admin) return { error: "This account does not have admin access." };
+        const developer = (data as { isDeveloper?: boolean }).isDeveloper;
         setStoredToken(t);
         setToken(t);
         setIsAdmin(true);
+        setIsDeveloper(Boolean(developer));
         return {};
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Could not reach server.";
@@ -91,6 +100,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     setStoredToken(null);
     setToken(null);
     setIsAdmin(false);
+    setIsDeveloper(false);
   }, []);
 
   const apiRequest = useCallback(
@@ -106,6 +116,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const value: AdminAuthContextValue = {
     token,
     isAdmin,
+    isDeveloper,
     loading,
     login,
     logout,

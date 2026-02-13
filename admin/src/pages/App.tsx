@@ -35,7 +35,7 @@ type ViewKey =
 type TaxRateOption = { id: string; name: string; ratePercent: number };
 
 export const App: React.FC = () => {
-  const { apiRequest, logout } = useAdminAuth();
+  const { apiRequest, logout, isDeveloper } = useAdminAuth();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [basePriceCents, setBasePriceCents] = React.useState<number | "">("");
@@ -113,6 +113,8 @@ export const App: React.FC = () => {
   const [clubsFromApi, setClubsFromApi] = React.useState<
     { id: string; name: string; code: string; description: string }[] | null
   >(null);
+  const [clubsLoadError, setClubsLoadError] = React.useState<string | null>(null);
+  const [clubsSeeding, setClubsSeeding] = React.useState(false);
   const [editingClubId, setEditingClubId] = React.useState<string | null>(null);
   const [editClubName, setEditClubName] = React.useState("");
   const [editClubCode, setEditClubCode] = React.useState("");
@@ -248,16 +250,21 @@ export const App: React.FC = () => {
   }, [view, loadStripeConfig]);
 
   const loadClubs = React.useCallback(async () => {
+    setClubsLoadError(null);
     try {
       const res = await apiRequest("/api/clubs");
       if (res.ok) {
         const data = await res.json();
         setClubsFromApi(Array.isArray(data) ? data : []);
-      } else setClubsFromApi([]);
+      } else {
+        setClubsFromApi([]);
+        setClubsLoadError(`API returned ${res.status}. Check that the backend is running.`);
+      }
     } catch {
       setClubsFromApi([]);
+      setClubsLoadError("Could not reach the API. Check that the backend is running and VITE_API_BASE is set (e.g. https://your-backend.up.railway.app).");
     }
-  }, []);
+  }, [apiRequest]);
 
   React.useEffect(() => {
     loadClubs();
@@ -353,6 +360,10 @@ export const App: React.FC = () => {
   React.useEffect(() => {
     if (view === "developerFees") loadFeeConfig();
   }, [view, loadFeeConfig]);
+
+  React.useEffect(() => {
+    if (!isDeveloper && view === "developerFees") setView("dashboard");
+  }, [isDeveloper, view]);
 
   const loadUsers = React.useCallback(async () => {
     try {
@@ -923,6 +934,7 @@ export const App: React.FC = () => {
           >
             Manage memberships
           </button>
+          {isDeveloper && (
           <button
             style={{
               textAlign: "left",
@@ -940,6 +952,7 @@ export const App: React.FC = () => {
           >
             Developer fees
           </button>
+          )}
           <button
             style={{
               textAlign: "left",
@@ -1042,7 +1055,7 @@ export const App: React.FC = () => {
               border: "1px solid #262637"
             }}
           >
-            Role: Admin / Developer
+            Role: {isDeveloper ? "Developer" : "Admin"}
           </div>
         </header>
 
@@ -1866,7 +1879,7 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {view === "developerFees" && (
+        {view === "developerFees" && isDeveloper && (
           <section
             style={{
               padding: "1.25rem 1.35rem 1.5rem",
@@ -2486,10 +2499,45 @@ export const App: React.FC = () => {
               <p style={{ fontSize: 12, color: "#8a8cab", marginTop: 0, marginBottom: 16 }}>
                 Edit club name, code, and description. These clubs are used for memberships and member assignments. Codes must be one of: SAP, WOOD, CELLARS, FOUNDERS.
               </p>
-              {clubsFromApi === null ? (
+              {clubsFromApi === null && !clubsLoadError ? (
                 <p style={{ fontSize: 13, color: "#8a8cab" }}>Loading clubs…</p>
-              ) : clubsFromApi.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#6f7087" }}>No clubs from backend. Ensure the API is running.</p>
+              ) : clubsFromApi?.length === 0 ? (
+                <div style={{ marginBottom: 12 }}>
+                  <p style={{ fontSize: 13, color: clubsLoadError ? "#c94a4a" : "#6f7087", marginTop: 0, marginBottom: 8 }}>
+                    {clubsLoadError ?? "No clubs in the database yet. Create default clubs (Wood Club, Sap Club) or retry after restarting the backend."}
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {!clubsLoadError && (
+                      <button
+                        type="button"
+                        disabled={clubsSeeding}
+                        onClick={async () => {
+                          setClubsSeeding(true);
+                          try {
+                            const res = await apiRequest("/api/clubs/seed-defaults", { method: "POST" });
+                            if (res.ok) {
+                              const data = await res.json();
+                              if (data.clubs) setClubsFromApi(data.clubs);
+                              else await loadClubs();
+                            } else await loadClubs();
+                          } finally {
+                            setClubsSeeding(false);
+                          }
+                        }}
+                        style={{ padding: "0.4rem 0.8rem", fontSize: 13, cursor: clubsSeeding ? "wait" : "pointer", borderRadius: 8, border: "1px solid #262637", background: "#17172b", color: "#e5e7ff" }}
+                      >
+                        {clubsSeeding ? "Creating…" : "Create default clubs (Wood, Sap)"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => loadClubs()}
+                      style={{ padding: "0.4rem 0.8rem", fontSize: 13, cursor: "pointer", borderRadius: 8, border: "1px solid #262637", background: "#17172b", color: "#e5e7ff" }}
+                    >
+                      Retry loading clubs
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, border: "1px solid #262637", borderRadius: 12, overflow: "hidden" }}>
                   {clubsFromApi.map((club) => (
@@ -2642,11 +2690,25 @@ export const App: React.FC = () => {
               <h2 style={{ fontSize: 16, margin: "0 0 4px" }}>
                 {editingMembershipId ? "Edit membership offering" : "Create membership offering"}
               </h2>
+              {clubsFromApi && clubsFromApi.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#a3a3bf", marginTop: 0, marginBottom: 12 }}>
+                  No clubs yet. Add clubs in Settings → Active clubs first, then come back here to create a membership.
+                </p>
+              ) : null}
               <p style={{ fontSize: 12, color: "#8a8cab", marginTop: 0, marginBottom: 16 }}>
                 {editingMembershipId
                   ? "Update the offering below and save."
                   : "Set up a club membership for a given year: when it's on sale and how many spots are available."}
               </p>
+              {clubsFromApi && clubsFromApi.length === 0 ? (
+                <button
+                  type="button"
+                  style={{ ...inputStyle, marginBottom: 16, cursor: "pointer" }}
+                  onClick={() => setView("settings")}
+                >
+                  Go to Settings → Active clubs
+                </button>
+              ) : null}
               <form
                 onSubmit={handleCreateMembership}
                 style={{

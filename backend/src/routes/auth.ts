@@ -30,6 +30,21 @@ export function isAdminUser(email: string): boolean {
   return getAdminEmails().includes(email.trim().toLowerCase());
 }
 
+/** Emails that can access the Developer fees tab and API. Set DEVELOPER_EMAILS in .env (e.g. DEVELOPER_EMAILS=you@example.com). Dev account is always included. */
+export function getDeveloperEmails(): string[] {
+  const raw = process.env.DEVELOPER_EMAILS ?? "";
+  const fromEnv = raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (!fromEnv.includes(DEV_ACCOUNT_EMAIL)) fromEnv.push(DEV_ACCOUNT_EMAIL);
+  return fromEnv;
+}
+
+export function isDeveloperUser(email: string): boolean {
+  return getDeveloperEmails().includes(email.trim().toLowerCase());
+}
+
 function randomToken(): string {
   return `tk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
@@ -66,6 +81,16 @@ export function isPublicApiRoute(method: string, path: string): boolean {
   return false;
 }
 
+/** Middleware: require valid Bearer token and user email in DEVELOPER_EMAILS. Use after requireAdmin. */
+export function requireDeveloper(req: Request, res: Response, next: (err?: unknown) => void): void {
+  const u = (req as Request & { user?: { id: string; email: string } }).user;
+  if (!u || !isDeveloperUser(u.email)) {
+    res.status(403).json({ error: "Developer access required" });
+    return;
+  }
+  next();
+}
+
 /** Middleware: require valid Bearer token and user email in ADMIN_EMAILS. */
 export function requireAdmin(req: Request, res: Response, next: (err?: unknown) => void): void {
   void (async () => {
@@ -89,6 +114,7 @@ export function requireAdmin(req: Request, res: Response, next: (err?: unknown) 
         res.status(403).json({ error: "Admin access only" });
         return;
       }
+      (req as Request & { user?: { id: string; email: string } }).user = { id: user.id, email: user.email };
       next();
     } catch (e) {
       next(e);
@@ -136,9 +162,11 @@ export function registerAuthRoutes(router: IRouter) {
     const token = randomToken();
     tokenStore.set(token, { userId: user.id });
     const isAdmin = isAdminUser(user.email);
+    const isDeveloper = isDeveloperUser(user.email);
     res.json({
       token,
       isAdmin,
+      isDeveloper,
       member: {
         id: user.id,
         email: user.email,
@@ -182,6 +210,7 @@ export function registerAuthRoutes(router: IRouter) {
       })
     );
     const isAdmin = isAdminUser(user.email);
+    const isDeveloper = isDeveloperUser(user.email);
     res.json({
       member: {
         id: user.id,
@@ -191,7 +220,8 @@ export function registerAuthRoutes(router: IRouter) {
         memberships: memberMemberships,
         membershipYear: activeYear
       },
-      isAdmin
+      isAdmin,
+      isDeveloper
     });
   });
 

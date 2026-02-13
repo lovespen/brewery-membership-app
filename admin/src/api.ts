@@ -1,10 +1,15 @@
 /**
  * API base URL. Must set VITE_API_BASE when building for production (e.g. Vercel).
+ * Use the full URL with protocol: https://your-backend.up.railway.app
  * In dev, defaults to http://localhost:4000.
  */
 export function getApiBase(): string {
   const env = (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
-  if (env && env.trim()) return env.trim().replace(/\/$/, "");
+  if (env && env.trim()) {
+    let base = env.trim().replace(/\/$/, "");
+    if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+    return base;
+  }
   return "http://localhost:4000";
 }
 

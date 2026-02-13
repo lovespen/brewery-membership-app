@@ -49,11 +49,35 @@ export async function getClubByCode(code: string): Promise<Club | undefined> {
   };
 }
 
+const DEFAULT_CLUBS = [
+  { name: "Wood Club", code: "WOOD", description: "Wood Club membership" },
+  { name: "Sap Club", code: "SAP", description: "Sap Club membership" }
+];
+
+/** Creates default clubs if the database has none. Returns how many were created. */
+export async function ensureDefaultClubs(): Promise<number> {
+  const count = await prisma.club.count();
+  if (count > 0) return 0;
+  for (const { name, code, description } of DEFAULT_CLUBS) {
+    await prisma.club.create({
+      data: { name, code, description: description ?? "" }
+    });
+  }
+  return DEFAULT_CLUBS.length;
+}
+
 export function registerClubRoutes(router: IRouter) {
   // GET /api/clubs - list clubs
   router.get("/clubs", async (_req: Request, res: Response) => {
     const clubs = await getClubs();
     res.json(clubs);
+  });
+
+  // POST /api/clubs/seed-defaults - create Wood Club + Sap Club if none exist (admin)
+  router.post("/clubs/seed-defaults", async (_req: Request, res: Response) => {
+    const created = await ensureDefaultClubs();
+    const clubs = await getClubs();
+    res.json({ created, clubs });
   });
 
   // GET /api/clubs/:id - get one club

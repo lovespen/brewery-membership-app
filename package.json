@@ -7,7 +7,10 @@
     "dev": "concurrently -n backend,admin,member -c blue,magenta,green \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:member\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:admin": "cd admin && npm run dev",
-    "dev:member": "cd member-web && npm run dev"
+    "dev:member": "cd member-web && npm run dev",
+    "deploy:admin": "npm run deploy --prefix admin",
+    "deploy:member-web": "npm run deploy --prefix member-web",
+    "deploy:frontends": "npm run deploy:admin && npm run deploy:member-web"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
