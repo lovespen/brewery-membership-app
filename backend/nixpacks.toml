@@ -1,0 +1,11 @@
+# Railway/Nixpacks: ensure Node 18+ and full install for build
+[providers.node]
+version = "20"
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+# Start uses package.json "start" (migrate + node)
