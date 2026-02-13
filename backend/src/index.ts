@@ -34,7 +34,10 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Require admin (Bearer token with email in ADMIN_EMAILS) for all /api/* except public routes
+// Register auth routes first so login/register/etc. are matched before the /api admin gate
+registerAuthRoutes(app);
+
+// Require admin (Bearer token with email in ADMIN_EMAILS) for all other /api/* routes
 app.use("/api", (req, res, next) => {
   if (isPublicApiRoute(req.method, req.path)) return next();
   requireAdmin(req, res, next);
@@ -50,7 +53,6 @@ registerCartRoutes(app);
 registerCheckoutRoutes(app);
 registerUserRoutes(app);
 registerUserMembershipRoutes(app);
-registerAuthRoutes(app);
 registerTipRoutes(app);
 registerNotificationRoutes(app);
 registerPickupRoutes(app);
