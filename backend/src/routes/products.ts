@@ -83,11 +83,11 @@ export function decrementProductInventory(productId: string, amount: number): bo
 export function registerProductRoutes(app: Express) {
   // GET /api/products - list products (optionally filtered by club)
   // For shop (includeInactive=false): preorder products only appear when within preorder window.
-  app.get("/api/products", (req: Request, res: Response) => {
+  app.get("/api/products", async (req: Request, res: Response) => {
     const clubCode = (req.query.clubCode as string | undefined)?.toUpperCase() as
       | ClubCode
       | undefined;
-    const validCodes = getClubCodes();
+    const validCodes = await getClubCodes();
     const clubCodesParam = req.query.clubCodes as string | undefined;
     const clubCodes: ClubCode[] = clubCodesParam
       ? clubCodesParam

@@ -23,10 +23,10 @@ type PushSubscriptionRecord = {
 const notifications: PushNotification[] = [];
 const pushSubscriptions: PushSubscriptionRecord[] = [];
 
-let vapidPublicKey: string;
-let vapidPrivateKey: string;
+let vapidPublicKey!: string;
+let vapidPrivateKey!: string;
 
-function initVapid() {
+function initVapid(): void {
   const pub = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (pub && priv) {
@@ -118,7 +118,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // POST /api/push-subscriptions - register a push subscription (from member app)
-  app.post("/api/push-subscriptions", (req: Request, res: Response) => {
+  app.post("/api/push-subscriptions", async (req: Request, res: Response) => {
     const { subscription, clubCodes: clubCodesBody } = req.body;
 
     if (!subscription || typeof subscription !== "object" || !subscription.endpoint) {
@@ -130,7 +130,7 @@ export function registerNotificationRoutes(app: Express) {
       return res.status(400).json({ error: "subscription.keys.auth and keys.p256dh are required" });
     }
 
-    const validCodes = getClubCodes();
+    const validCodes = await getClubCodes();
     const clubCodes: ClubCode[] = Array.isArray(clubCodesBody)
       ? (clubCodesBody
           .map((c: string) => (c || "").toString().trim().toUpperCase())
@@ -203,7 +203,7 @@ export function registerNotificationRoutes(app: Express) {
     const bodyStr =
       typeof body === "string" ? body : "";
 
-    const validCodesNotif = getClubCodes();
+    const validCodesNotif = await getClubCodes();
     const clubCodes: ClubCode[] = Array.isArray(clubCodesBody)
       ? (clubCodesBody
           .map((c: string) => (c || "").toString().trim().toUpperCase())

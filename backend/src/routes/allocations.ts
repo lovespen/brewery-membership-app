@@ -44,7 +44,7 @@ export function registerAllocationRoutes(app: Express) {
 
   // POST /api/products/:productId/allocations - create allocation (admin)
   // Body: { quantityPerPerson, targetType: 'club'|'members', clubCode?, memberIds?, pullFromInventory: boolean }
-  app.post("/api/products/:productId/allocations", (req: Request, res: Response) => {
+  app.post("/api/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
     const product = getProductById(productId);
     if (!product) {
@@ -73,7 +73,7 @@ export function registerAllocationRoutes(app: Express) {
     let memberIds: string[] = [];
 
     if (target === "club") {
-      const validCodes = getClubCodes();
+      const validCodes = await getClubCodes();
       const code = (bodyClubCode || "").toString().trim().toUpperCase() as ClubCode;
       if (!validCodes.includes(code)) {
         return res.status(400).json({
@@ -133,7 +133,13 @@ export function registerAllocationRoutes(app: Express) {
 
     const isPreorderAllocation = product.isPreorder && product.releaseAt;
     const status = isPreorderAllocation ? ("NOT_READY" as const) : ("READY_FOR_PICKUP" as const);
-    const releaseAt = isPreorderAllocation ? product.releaseAt : null;
+    const releaseAtRaw = isPreorderAllocation ? product.releaseAt : null;
+    const releaseAt: string | null =
+      releaseAtRaw != null
+        ? typeof releaseAtRaw === "string"
+          ? releaseAtRaw
+          : (releaseAtRaw as Date).toISOString()
+        : null;
 
     addEntitlements(
       memberIds.map((userId) => ({

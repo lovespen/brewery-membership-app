@@ -61,7 +61,7 @@ export async function getUserByEmail(email: string): Promise<InMemoryUser | unde
 
 export async function getAllUsers(): Promise<InMemoryUser[]> {
   const list = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
-  return list.map((u) => ({
+  return list.map((u: { id: string; email: string; name: string | null; passwordHash: string | null; createdAt: Date }) => ({
     id: u.id,
     email: u.email,
     name: u.name,
@@ -124,7 +124,7 @@ export function registerUserRoutes(app: Express) {
       select: { id: true, email: true, name: true, createdAt: true }
     });
     res.json(
-      users.map((u) => ({
+      users.map((u: { id: string; email: string; name: string | null; createdAt: Date }) => ({
         id: u.id,
         email: u.email,
         name: u.name,

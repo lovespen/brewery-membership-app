@@ -31,8 +31,8 @@ export function getMemberIdsExist(ids: string[]): boolean {
 
 export function registerMemberRoutes(app: Express) {
   // GET /api/members - list members (optional ?clubCode= for filter)
-  app.get("/api/members", (req: Request, res: Response) => {
-    const validCodes = getClubCodes();
+  app.get("/api/members", async (req: Request, res: Response) => {
+    const validCodes = await getClubCodes();
     const clubCode = (req.query.clubCode as string | undefined)?.trim().toUpperCase() as ClubCode | undefined;
     let list = [...members];
     if (clubCode && validCodes.includes(clubCode)) {

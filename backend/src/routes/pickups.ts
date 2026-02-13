@@ -24,47 +24,50 @@ type PickupRow = {
   memberEmail: string | null;
 };
 
-function resolveDisplayName(userId: string): { name: string | null; email: string | null } {
+async function resolveDisplayName(userId: string): Promise<{ name: string | null; email: string | null }> {
   const member = getMemberById(userId);
   if (member) return { name: member.name ?? null, email: member.email ?? null };
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (user) return { name: user.name ?? null, email: user.email ?? null };
   return { name: null, email: null };
 }
 
 export function registerPickupRoutes(app: Express) {
   // GET /api/pickups - list entitlements ready for pickup or already picked up (for admin)
-  app.get("/api/pickups", (_req: Request, res: Response) => {
+  app.get("/api/pickups", async (_req: Request, res: Response) => {
     promotePreordersToReady();
     const all = getAllEntitlements();
     const relevant = all.filter(
       (e) => e.status === "READY_FOR_PICKUP" || e.status === "PICKED_UP"
     );
-    const rows: PickupRow[] = relevant.map((e) => {
-      const { name, email } = resolveDisplayName(e.userId);
-      const product = getProductById(e.productId);
-      return {
-        id: e.id,
-        userId: e.userId,
-        productId: e.productId,
-        productName: product?.name ?? e.productId,
-        quantity: e.quantity,
-        status: e.status as "READY_FOR_PICKUP" | "PICKED_UP",
-        source: e.source,
-        releaseAt: e.releaseAt,
-        pickedUpAt: e.pickedUpAt,
-        memberName: name,
-        memberEmail: email
-      };
-    });
+    const rows: PickupRow[] = await Promise.all(
+      relevant.map(async (e) => {
+        const { name, email } = await resolveDisplayName(e.userId);
+        const product = getProductById(e.productId);
+        return {
+          id: e.id,
+          userId: e.userId,
+          productId: e.productId,
+          productName: product?.name ?? e.productId,
+          quantity: e.quantity,
+          status: e.status as "READY_FOR_PICKUP" | "PICKED_UP",
+          source: e.source,
+          releaseAt: e.releaseAt,
+          pickedUpAt: e.pickedUpAt,
+          memberName: name,
+          memberEmail: email
+        };
+      })
+    );
     res.json({ pickups: rows });
   });
 
   // GET /api/pickups/by-member/:memberId - pickups for one member (for staff scan page)
-  app.get("/api/pickups/by-member/:memberId", (req: Request, res: Response) => {
+  app.get("/api/pickups/by-member/:memberId", async (req: Request, res: Response) => {
     promotePreordersToReady();
     const { memberId } = req.params;
-    const memberRecord = getMemberById(memberId) ?? getUserById(memberId);
+    const memberFromList = getMemberById(memberId);
+    const memberRecord = memberFromList ?? await getUserById(memberId);
     if (!memberRecord) {
       res.status(404).json({ error: "Member not found" });
       return;

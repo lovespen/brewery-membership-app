@@ -10,7 +10,7 @@ export type Club = {
 
 export async function getClubs(): Promise<Club[]> {
   const list = await prisma.club.findMany({ orderBy: { code: "asc" } });
-  return list.map((c) => ({
+  return list.map((c: { id: string; name: string; code: string; description: string | null }) => ({
     id: c.id,
     name: c.name,
     code: c.code,
@@ -21,7 +21,7 @@ export async function getClubs(): Promise<Club[]> {
 /** Valid club codes for the current season (from admin-defined clubs). */
 export async function getClubCodes(): Promise<string[]> {
   const list = await prisma.club.findMany({ select: { code: true }, orderBy: { code: "asc" } });
-  return list.map((c) => c.code);
+  return list.map((c: { code: string }) => c.code);
 }
 
 export async function getClubById(id: string): Promise<Club | undefined> {

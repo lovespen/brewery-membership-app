@@ -42,7 +42,7 @@ export function registerUserMembershipRoutes(app: Express) {
       orderBy: [{ year: "desc" }, { club: { code: "asc" } }]
     });
     const withUser = await Promise.all(
-      memberships.map(async (m) => {
+      memberships.map(async (m: { id: string; userId: string; year: number; status: string; createdAt: Date; club: { code: string }; user: { email: string; name: string | null } }) => {
         const offering = await getMembershipByClubAndYear(m.club.code, m.year);
         return {
           id: m.id,

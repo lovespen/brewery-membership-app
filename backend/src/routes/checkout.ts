@@ -58,7 +58,7 @@ export function registerCheckoutRoutes(app: Express) {
     const clubCode = typeof memberClubCode === "string"
       ? (memberClubCode.toUpperCase() as ClubCode)
       : undefined;
-    const validClubCodes = getClubCodes();
+    const validClubCodes = await getClubCodes();
     if (clubCode && !validClubCodes.includes(clubCode)) {
       return res.status(400).json({
         error: validClubCodes.length > 0
@@ -103,7 +103,7 @@ export function registerCheckoutRoutes(app: Express) {
 
     let membershipCents = 0;
     if (membershipId && typeof membershipId === "string") {
-      const offering = getMembershipById(membershipId);
+      const offering = await getMembershipById(membershipId);
       if (!offering || !offering.isActive) {
         return res.status(400).json({ error: "Invalid or inactive membership" });
       }

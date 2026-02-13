@@ -66,27 +66,33 @@ export function isPublicApiRoute(method: string, path: string): boolean {
 }
 
 /** Middleware: require valid Bearer token and user email in ADMIN_EMAILS. */
-export function requireAdmin(req: Request, res: Response, next: () => void): void {
-  const token = getAuthToken(req);
-  if (!token) {
-    res.status(401).json({ error: "Admin access requires login" });
-    return;
-  }
-  const session = tokenStore.get(token);
-  if (!session) {
-    res.status(401).json({ error: "Session expired" });
-    return;
-  }
-  const user = getUserById(session.userId);
-  if (!user) {
-    res.status(401).json({ error: "Account not found" });
-    return;
-  }
-  if (!isAdminUser(user.email)) {
-    res.status(403).json({ error: "Admin access only" });
-    return;
-  }
-  next();
+export function requireAdmin(req: Request, res: Response, next: (err?: unknown) => void): void {
+  void (async () => {
+    try {
+      const token = getAuthToken(req);
+      if (!token) {
+        res.status(401).json({ error: "Admin access requires login" });
+        return;
+      }
+      const session = tokenStore.get(token);
+      if (!session) {
+        res.status(401).json({ error: "Session expired" });
+        return;
+      }
+      const user = await getUserById(session.userId);
+      if (!user) {
+        res.status(401).json({ error: "Account not found" });
+        return;
+      }
+      if (!isAdminUser(user.email)) {
+        res.status(403).json({ error: "Admin access only" });
+        return;
+      }
+      next();
+    } catch (e) {
+      next(e);
+    }
+  })();
 }
 
 export function registerAuthRoutes(app: Express) {
@@ -110,20 +116,22 @@ export function registerAuthRoutes(app: Express) {
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    const allRecords = getMembershipRecordsByUserId(user.id);
+    const allRecords = await getMembershipRecordsByUserId(user.id);
     const activeYear = getActiveMembershipYear();
     const records = allRecords.filter((r) => r.year === activeYear);
     const clubs = [...new Set(records.map((m) => m.clubCode))] as ClubCode[];
-    const memberMemberships = records.map((r) => {
-      const offering = getMembershipByClubAndYear(r.clubCode, r.year);
-      const club = getClubByCode(r.clubCode);
-      return {
-        clubCode: r.clubCode,
-        clubName: club?.name ?? r.clubCode,
-        year: r.year,
-        toastDiscountCode: offering?.toastDiscountCode ?? `${r.clubCode}${r.year}`
-      };
-    });
+    const memberMemberships = await Promise.all(
+      records.map(async (r) => {
+        const offering = await getMembershipByClubAndYear(r.clubCode, r.year);
+        const club = await getClubByCode(r.clubCode);
+        return {
+          clubCode: r.clubCode,
+          clubName: club?.name ?? r.clubCode,
+          year: r.year,
+          toastDiscountCode: offering?.toastDiscountCode ?? `${r.clubCode}${r.year}`
+        };
+      })
+    );
     const token = randomToken();
     tokenStore.set(token, { userId: user.id });
     const isAdmin = isAdminUser(user.email);
@@ -142,7 +150,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // GET /api/auth/me - current member from token
-  app.get("/api/auth/me", (req: Request, res: Response) => {
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
     const token = getAuthToken(req);
     if (!token) {
       return res.status(401).json({ error: "Not logged in" });
@@ -151,25 +159,27 @@ export function registerAuthRoutes(app: Express) {
     if (!session) {
       return res.status(401).json({ error: "Session expired" });
     }
-    const user = getUserById(session.userId);
+    const user = await getUserById(session.userId);
     if (!user) {
       tokenStore.delete(token);
       return res.status(401).json({ error: "Account not found" });
     }
-    const allRecords = getMembershipRecordsByUserId(user.id);
+    const allRecords = await getMembershipRecordsByUserId(user.id);
     const activeYear = getActiveMembershipYear();
     const records = allRecords.filter((r) => r.year === activeYear);
     const clubs = [...new Set(records.map((m) => m.clubCode))] as ClubCode[];
-    const memberMemberships = records.map((r) => {
-      const offering = getMembershipByClubAndYear(r.clubCode, r.year);
-      const club = getClubByCode(r.clubCode);
-      return {
-        clubCode: r.clubCode,
-        clubName: club?.name ?? r.clubCode,
-        year: r.year,
-        toastDiscountCode: offering?.toastDiscountCode ?? `${r.clubCode}${r.year}`
-      };
-    });
+    const memberMemberships = await Promise.all(
+      records.map(async (r) => {
+        const offering = await getMembershipByClubAndYear(r.clubCode, r.year);
+        const club = await getClubByCode(r.clubCode);
+        return {
+          clubCode: r.clubCode,
+          clubName: club?.name ?? r.clubCode,
+          year: r.year,
+          toastDiscountCode: offering?.toastDiscountCode ?? `${r.clubCode}${r.year}`
+        };
+      })
+    );
     const isAdmin = isAdminUser(user.email);
     res.json({
       member: {
@@ -201,7 +211,7 @@ export function registerAuthRoutes(app: Express) {
     if (!session) {
       return res.status(401).json({ error: "Session expired" });
     }
-    const user = getUserById(session.userId);
+    const user = await getUserById(session.userId);
     if (!user) {
       return res.status(401).json({ error: "Account not found" });
     }
@@ -219,7 +229,7 @@ export function registerAuthRoutes(app: Express) {
       }
     }
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    setUserPasswordHash(user.id, passwordHash);
+    await setUserPasswordHash(user.id, passwordHash);
     res.json({ ok: true });
   });
 }
