@@ -52,8 +52,8 @@ export async function getClubByCode(code: string): Promise<Club | undefined> {
 const DEFAULT_CLUBS = [
   { name: "Wood Club", code: "WOOD", description: "Wood Club membership" },
   { name: "Sap Club", code: "SAP", description: "Sap Club membership" },
-  { name: "Cellars", code: "CELLARS", description: "Cellars membership (combination of Sap and Wood)" },
-  { name: "Founders", code: "FOUNDERS", description: "Founders membership (combination of Sap and Wood)" }
+  { name: "Cellars", code: "CELLARS", description: "Cellars membership" },
+  { name: "Founders", code: "FOUNDERS", description: "Founders membership" }
 ];
 
 /** Creates default clubs if the database has none. Returns how many were created. Used at startup. */

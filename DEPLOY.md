@@ -48,6 +48,29 @@ npm start
 
 For a long-running server, use a process manager (e.g. systemd, PM2) or your host’s start command.
 
+### Deploy backend on Railway
+
+1. **Create a project** at [railway.app](https://railway.app). Log in (e.g. with GitHub).
+
+2. **New project** → **Deploy from GitHub repo** → select your `brewery-membership-app` repo.
+
+3. **Add PostgreSQL:** In the project, click **+ New** → **Database** → **PostgreSQL**. Railway will create a DB and expose `DATABASE_URL` (you’ll link it in step 5).
+
+4. **Configure the backend service:**
+   - Click your **backend service** (the one from the repo).
+   - **Settings** → **Root Directory**: set to **`backend`**. (Required so Railway runs from the `backend` folder.)
+   - **Settings** → **Build Command**: leave default (Nixpacks uses `npm run build` from `backend/nixpacks.toml`).
+   - **Settings** → **Start Command**: leave default so Railway runs **`npm start`** (which runs `npx prisma migrate deploy` then `node dist/index.js`).
+
+5. **Variables:**
+   - **Variables** tab → **+ New Variable**.
+   - Add **`DATABASE_URL`**: either **Add a variable** and paste the PostgreSQL URL, or use **Add a reference** and choose the variable from your PostgreSQL service (e.g. `DATABASE_URL` or `DATABASE_PRIVATE_URL`).
+   - Optionally add **`ADMIN_EMAILS`** (comma-separated admin emails) and **`PORT`** (Railway often sets `PORT` automatically; your app reads it from env).
+
+6. **Deploy:** Push a commit to the connected branch, or **Deployments** → **Redeploy**. After the build, the service will run migrations on start and listen on `PORT`.
+
+7. **Public URL:** In the service, open **Settings** → **Networking** → **Generate domain** (or use a custom domain). Use this URL as **`VITE_API_BASE`** in your Vercel admin and member-web projects.
+
 ### Local development
 
 - Copy `backend/.env.example` to `backend/.env`, set `DATABASE_URL` and optionally `ADMIN_EMAILS`.
