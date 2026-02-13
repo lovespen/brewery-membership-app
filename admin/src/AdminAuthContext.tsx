@@ -67,7 +67,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ email: email.trim(), password })
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) return { error: (data as { error?: string }).error || "Login failed" };
+        if (!res.ok) {
+          const msg = (data as { error?: string }).error;
+          return { error: msg ? String(msg) : `Login failed (${res.status})` };
+        }
         const t = (data as { token?: string }).token;
         const admin = (data as { isAdmin?: boolean }).isAdmin;
         if (!t) return { error: "No token received" };
@@ -76,8 +79,9 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setToken(t);
         setIsAdmin(true);
         return {};
-      } catch {
-        return { error: "Could not reach server. Check the API URL and try again." };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Could not reach server.";
+        return { error: `Could not reach server. Check the API URL and try again. (${msg})` };
       }
     },
     [apiBase]
