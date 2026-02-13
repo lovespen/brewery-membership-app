@@ -104,6 +104,77 @@ function getPersonaMemberId(persona: PersonaKey): string | null {
   return DEMO_MEMBER_ID_BY_CLUB[persona] ?? "m1";
 }
 
+const JOIN_DESC_PREVIEW_LEN = 120;
+
+function JoinClubCard({
+  offering,
+  clubsFromApi,
+  getClubLabel,
+  formatUSD,
+  startCheckout
+}: {
+  offering: MembershipOffering;
+  clubsFromApi: { code: string; name: string }[] | null;
+  getClubLabel: (clubs: { code: string; name: string }[] | null, code: string) => string;
+  formatUSD: (cents: number) => string;
+  startCheckout: (offeringId: string) => void;
+}) {
+  const desc =
+    offering.description ||
+    `${getClubLabel(clubsFromApi, offering.clubCode)} • ${offering.year} membership`;
+  const [expanded, setExpanded] = React.useState(false);
+  const isLong = desc.length > JOIN_DESC_PREVIEW_LEN;
+  const showText = isLong && !expanded ? `${desc.slice(0, JOIN_DESC_PREVIEW_LEN).trim()}…` : desc;
+  return (
+    <div style={styles.joinCard}>
+      <div style={styles.productTitle}>{offering.name}</div>
+      <div
+        style={{
+          ...styles.productDesc,
+          whiteSpace: "pre-wrap" as const,
+          wordBreak: "break-word"
+        }}
+      >
+        {showText}
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            fontSize: 12,
+            color: "#7a9eff",
+            cursor: "pointer",
+            marginTop: 4,
+            marginBottom: 4
+          }}
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+      {typeof offering.year === "number" && (
+        <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
+          {offering.year} membership
+        </div>
+      )}
+      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
+        {formatUSD(offering.priceCents)}
+      </div>
+      <button
+        type="button"
+        style={styles.primaryBtn}
+        onClick={() => startCheckout(offering.id)}
+        disabled={offering.priceCents <= 0}
+      >
+        Purchase membership
+      </button>
+    </div>
+  );
+}
+
 function CheckoutForm({
   clientSecret,
   onSuccess,
@@ -1285,28 +1356,14 @@ export const MemberPreview: React.FC = () => {
             return (
               <div style={styles.joinGrid}>
                 {activeOfferings.map((offering) => (
-                  <div key={offering.id} style={styles.joinCard}>
-                    <div style={styles.productTitle}>{offering.name}</div>
-                    <div style={styles.productDesc}>
-                      {offering.description || `${getClubLabel(clubsFromApi, offering.clubCode)} • ${offering.year} membership`}
-                    </div>
-                    {typeof offering.year === "number" && (
-                      <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
-                        {offering.year} membership
-                      </div>
-                    )}
-                    <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
-                      {formatUSD(offering.priceCents)}
-                    </div>
-                    <button
-                      type="button"
-                      style={styles.primaryBtn}
-                      onClick={() => startCheckout(offering.id)}
-                      disabled={offering.priceCents <= 0}
-                    >
-                      Purchase membership
-                    </button>
-                  </div>
+                  <JoinClubCard
+                    key={offering.id}
+                    offering={offering}
+                    clubsFromApi={clubsFromApi}
+                    getClubLabel={getClubLabel}
+                    formatUSD={formatUSD}
+                    startCheckout={startCheckout}
+                  />
                 ))}
               </div>
             );

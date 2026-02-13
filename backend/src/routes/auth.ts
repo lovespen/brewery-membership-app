@@ -71,6 +71,7 @@ export function isPublicApiRoute(method: string, path: string): boolean {
     ["GET", "/config/tip-percentages"]
   ];
   if (publicList.some(([m, p]) => m === method && p === path)) return true;
+  if (method === "GET" && /^\/memberships\/[^/]+$/.test(path)) return true;
   if (method === "GET" && /^\/members\/[^/]+\/entitlements$/.test(path)) return true;
   if (method === "GET" && path === "/cart") return true;
   if (method === "POST" && path === "/cart/items") return true;
