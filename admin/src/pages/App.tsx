@@ -2504,7 +2504,7 @@ export const App: React.FC = () => {
               ) : clubsFromApi?.length === 0 ? (
                 <div style={{ marginBottom: 12 }}>
                   <p style={{ fontSize: 13, color: clubsLoadError ? "#c94a4a" : "#6f7087", marginTop: 0, marginBottom: 8 }}>
-                    {clubsLoadError ?? "No clubs in the database yet. Create default clubs (Wood Club, Sap Club) or retry after restarting the backend."}
+                    {clubsLoadError ?? "No clubs in the database yet. Create default clubs (Wood, Sap, Cellars, Founders) or retry after restarting the backend."}
                   </p>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {!clubsLoadError && (
@@ -2526,7 +2526,7 @@ export const App: React.FC = () => {
                         }}
                         style={{ padding: "0.4rem 0.8rem", fontSize: 13, cursor: clubsSeeding ? "wait" : "pointer", borderRadius: 8, border: "1px solid #262637", background: "#17172b", color: "#e5e7ff" }}
                       >
-                        {clubsSeeding ? "Creating…" : "Create default clubs (Wood, Sap)"}
+                        {clubsSeeding ? "Creating…" : "Create default clubs (Wood, Sap, Cellars, Founders)"}
                       </button>
                     )}
                     <button

@@ -51,10 +51,12 @@ export async function getClubByCode(code: string): Promise<Club | undefined> {
 
 const DEFAULT_CLUBS = [
   { name: "Wood Club", code: "WOOD", description: "Wood Club membership" },
-  { name: "Sap Club", code: "SAP", description: "Sap Club membership" }
+  { name: "Sap Club", code: "SAP", description: "Sap Club membership" },
+  { name: "Cellars", code: "CELLARS", description: "Cellars membership (combination of Sap and Wood)" },
+  { name: "Founders", code: "FOUNDERS", description: "Founders membership (combination of Sap and Wood)" }
 ];
 
-/** Creates default clubs if the database has none. Returns how many were created. */
+/** Creates default clubs if the database has none. Returns how many were created. Used at startup. */
 export async function ensureDefaultClubs(): Promise<number> {
   const count = await prisma.club.count();
   if (count > 0) return 0;
@@ -66,6 +68,21 @@ export async function ensureDefaultClubs(): Promise<number> {
   return DEFAULT_CLUBS.length;
 }
 
+/** Creates only the default clubs that don't exist yet (by code). Returns how many were created. */
+export async function ensureMissingDefaultClubs(): Promise<number> {
+  let created = 0;
+  for (const { name, code, description } of DEFAULT_CLUBS) {
+    const existing = await getClubByCode(code);
+    if (!existing) {
+      await prisma.club.create({
+        data: { name, code, description: description ?? "" }
+      });
+      created += 1;
+    }
+  }
+  return created;
+}
+
 export function registerClubRoutes(router: IRouter) {
   // GET /api/clubs - list clubs
   router.get("/clubs", async (_req: Request, res: Response) => {
@@ -73,9 +90,9 @@ export function registerClubRoutes(router: IRouter) {
     res.json(clubs);
   });
 
-  // POST /api/clubs/seed-defaults - create Wood Club + Sap Club if none exist (admin)
+  // POST /api/clubs/seed-defaults - create any default clubs that don't exist yet (admin)
   router.post("/clubs/seed-defaults", async (_req: Request, res: Response) => {
-    const created = await ensureDefaultClubs();
+    const created = await ensureMissingDefaultClubs();
     const clubs = await getClubs();
     res.json({ created, clubs });
   });
