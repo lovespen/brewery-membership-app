@@ -83,6 +83,25 @@ export async function ensureMissingDefaultClubs(): Promise<number> {
   return created;
 }
 
+/** Updates Cellars and Founders descriptions to remove "combination" wording. Run at startup to fix existing DB rows. */
+export async function fixClubDescriptionsNoCombination(): Promise<void> {
+  const updates: { code: string; description: string }[] = [
+    { code: "CELLARS", description: "Cellars membership" },
+    { code: "FOUNDERS", description: "Founders membership" }
+  ];
+  for (const { code, description } of updates) {
+    const club = await prisma.club.findFirst({
+      where: { code: { equals: code, mode: "insensitive" } }
+    });
+    if (club && club.description.toLowerCase().includes("combination")) {
+      await prisma.club.update({
+        where: { id: club.id },
+        data: { description }
+      });
+    }
+  }
+}
+
 export function registerClubRoutes(router: IRouter) {
   // GET /api/clubs - list clubs
   router.get("/clubs", async (_req: Request, res: Response) => {

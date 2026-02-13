@@ -21,7 +21,7 @@ import { registerPickupRoutes } from "./routes/pickups";
 import { registerReportRoutes } from "./routes/reports";
 import { handleStripeWebhook } from "./routes/webhooks";
 import { ensureDevUser } from "./routes/users";
-import { ensureDefaultClubs } from "./routes/clubs";
+import { ensureDefaultClubs, fixClubDescriptionsNoCombination } from "./routes/clubs";
 import { loadConfigFromDb, ensureDefaultTaxRates } from "./routes/config";
 
 const app = express();
@@ -76,6 +76,7 @@ app.use("/api", apiRouter);
 const port = process.env.PORT || 4000;
 ensureDevUser()
   .then(() => ensureDefaultClubs().then(() => {}))
+  .then(() => fixClubDescriptionsNoCombination())
   .then(() => ensureDefaultTaxRates())
   .then(() => loadConfigFromDb())
   .then(() => {
