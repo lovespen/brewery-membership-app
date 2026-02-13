@@ -1272,59 +1272,42 @@ export const MemberPreview: React.FC = () => {
               : "Purchase a membership to get member-only releases, Toast discounts, and pickup perks. Check out with Stripe below."}
           </p>
           {(() => {
-            const clubs = clubsFromApi ?? [];
             const activeOfferings = memberships.filter((m) => m.isActive);
-            if (clubs.length === 0 && activeOfferings.length === 0) {
+            if (activeOfferings.length === 0) {
               return (
                 <div style={{ padding: "1rem 0" }}>
                   <p style={{ fontSize: 13, color: "#8a8cab", margin: 0 }}>
-                    No clubs or membership offerings available right now. Check back later or contact the brewery.
+                    No membership offerings available right now. Check back later or contact the brewery.
                   </p>
                 </div>
               );
             }
-            const offeringsByClub = new Map(activeOfferings.map((o) => [o.clubCode.toUpperCase(), o]));
-            const clubsToShow = clubs.length > 0 ? clubs : activeOfferings.map((o) => ({ id: o.id, name: o.name, code: o.clubCode, description: "" }));
             return (
               <div style={styles.joinGrid}>
-                {clubsToShow.map((club) => {
-                  const offering = offeringsByClub.get((club.code || "").toUpperCase());
-                  if (!offering) {
-                    return (
-                      <div key={club.id} style={styles.joinCard}>
-                        <div style={styles.productTitle}>{club.name}</div>
-                        <div style={styles.productDesc}>{club.description || `${club.code} Club`}</div>
-                        <p style={{ fontSize: 13, color: "#8a8cab", marginTop: 8, marginBottom: 0 }}>
-                          No membership offering available yet. Contact the brewery to join.
-                        </p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={offering.id} style={styles.joinCard}>
-                      <div style={styles.productTitle}>{offering.name}</div>
-                      <div style={styles.productDesc}>
-                        {offering.description || `${offering.clubCode} Club • ${offering.year} membership`}
-                      </div>
-                      {typeof offering.year === "number" && (
-                        <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
-                          {offering.year} membership
-                        </div>
-                      )}
-                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
-                        {formatUSD(offering.priceCents)}
-                      </div>
-                      <button
-                        type="button"
-                        style={styles.primaryBtn}
-                        onClick={() => startCheckout(offering.id)}
-                        disabled={offering.priceCents <= 0}
-                      >
-                        Purchase membership
-                      </button>
+                {activeOfferings.map((offering) => (
+                  <div key={offering.id} style={styles.joinCard}>
+                    <div style={styles.productTitle}>{offering.name}</div>
+                    <div style={styles.productDesc}>
+                      {offering.description || `${getClubLabel(clubsFromApi, offering.clubCode)} • ${offering.year} membership`}
                     </div>
-                  );
-                })}
+                    {typeof offering.year === "number" && (
+                      <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
+                        {offering.year} membership
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
+                      {formatUSD(offering.priceCents)}
+                    </div>
+                    <button
+                      type="button"
+                      style={styles.primaryBtn}
+                      onClick={() => startCheckout(offering.id)}
+                      disabled={offering.priceCents <= 0}
+                    >
+                      Purchase membership
+                    </button>
+                  </div>
+                ))}
               </div>
             );
           })()}
