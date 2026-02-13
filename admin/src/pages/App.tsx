@@ -22,6 +22,7 @@ type ClubPrice = {
 
 type ViewKey =
   | "dashboard"
+  | "clubs"
   | "products"
   | "memberships"
   | "pickups"
@@ -820,6 +821,21 @@ export const App: React.FC = () => {
               borderRadius: 999,
               padding: "0.5rem 0.9rem",
               background:
+                view === "clubs" ? "rgba(86, 119, 252, 0.18)" : "transparent",
+              color: view === "clubs" ? "#f5f5f7" : "#a3a3bf",
+              cursor: "pointer"
+            }}
+            onClick={() => setView("clubs")}
+          >
+            Clubs
+          </button>
+          <button
+            style={{
+              textAlign: "left",
+              border: "none",
+              borderRadius: 999,
+              padding: "0.5rem 0.9rem",
+              background:
                 view === "products" ? "rgba(86, 119, 252, 0.18)" : "transparent",
               color: view === "products" ? "#f5f5f7" : "#a3a3bf",
               cursor: "pointer"
@@ -1005,6 +1021,8 @@ export const App: React.FC = () => {
             <h1 style={{ fontSize: 22, margin: 0 }}>
               {view === "dashboard"
                 ? "Dashboard"
+                : view === "clubs"
+                ? "Clubs"
                 : view === "products"
                 ? "Products"
                 : view === "memberships"
@@ -1026,6 +1044,8 @@ export const App: React.FC = () => {
             <p style={{ fontSize: 13, marginTop: 4, color: "#a3a3bf" }}>
               {view === "dashboard" &&
                 "Overview of clubs and products."}
+              {view === "clubs" &&
+                "Manage clubs (Wood, Sap, Cellars, Founders). Create default clubs or edit names and codes."}
               {view === "products" &&
                 "Review all member products, filter by availability, and edit details below."}
               {view === "memberships" &&
@@ -2484,8 +2504,7 @@ export const App: React.FC = () => {
           </section>
         )}
 
-        {view === "memberships" && (
-          <>
+        {(view === "memberships" || view === "clubs") && (
             <section
               style={{
                 padding: "1.25rem 1.35rem 1.5rem",
@@ -2677,7 +2696,10 @@ export const App: React.FC = () => {
                 </ul>
               )}
             </section>
+        )}
 
+        {view === "memberships" && (
+          <>
             <section
               style={{
                 padding: "1.25rem 1.35rem 1.5rem",
@@ -2692,7 +2714,7 @@ export const App: React.FC = () => {
               </h2>
               {clubsFromApi && clubsFromApi.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#a3a3bf", marginTop: 0, marginBottom: 12 }}>
-                  No clubs yet. Add clubs in Settings → Active clubs first, then come back here to create a membership.
+                  No clubs yet. Go to Clubs in the sidebar to create default clubs (Wood, Sap, Cellars, Founders), then come back here to create a membership.
                 </p>
               ) : null}
               <p style={{ fontSize: 12, color: "#8a8cab", marginTop: 0, marginBottom: 16 }}>
@@ -2704,9 +2726,9 @@ export const App: React.FC = () => {
                 <button
                   type="button"
                   style={{ ...inputStyle, marginBottom: 16, cursor: "pointer" }}
-                  onClick={() => setView("settings")}
+                  onClick={() => setView("clubs")}
                 >
-                  Go to Settings → Active clubs
+                  Go to Clubs
                 </button>
               ) : null}
               <form
