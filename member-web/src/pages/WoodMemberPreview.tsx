@@ -214,6 +214,8 @@ export const MemberPreview: React.FC = () => {
   );
 
   const isGuest = loggedInMember ? false : persona === "NON_MEMBER";
+  const hasNoClubs = !!(loggedInMember && (!loggedInMember.clubs || loggedInMember.clubs.length === 0));
+  const showJoinSection = isGuest || hasNoClubs;
   const effectiveMemberId = loggedInMember ? loggedInMember.id : getPersonaMemberId(persona);
   const member = React.useMemo(
     () => {
@@ -1261,53 +1263,72 @@ export const MemberPreview: React.FC = () => {
         </section>
       </div>
 
-      {isGuest ? (
+      {showJoinSection ? (
         <section style={styles.card}>
           <h2 style={styles.h2}>Join a club</h2>
           <p style={{ fontSize: 13, color: "#a3a3bf", marginTop: 0, marginBottom: 14 }}>
-            Purchase a membership to get member-only releases, Toast
-            discounts, and pickup perks. Check out with Stripe below.
+            {hasNoClubs
+              ? "You don't have a club membership yet. Purchase one below to get member-only releases, Toast discounts, and pickup perks."
+              : "Purchase a membership to get member-only releases, Toast discounts, and pickup perks. Check out with Stripe below."}
           </p>
           {(() => {
+            const clubs = clubsFromApi ?? [];
             const activeOfferings = memberships.filter((m) => m.isActive);
-            if (activeOfferings.length === 0) {
+            if (clubs.length === 0 && activeOfferings.length === 0) {
               return (
                 <div style={{ padding: "1rem 0" }}>
                   <p style={{ fontSize: 13, color: "#8a8cab", margin: 0 }}>
-                    No membership offerings available right now. Check back later or contact the brewery.
+                    No clubs or membership offerings available right now. Check back later or contact the brewery.
                   </p>
                 </div>
               );
             }
+            const offeringsByClub = new Map(activeOfferings.map((o) => [o.clubCode.toUpperCase(), o]));
+            const clubsToShow = clubs.length > 0 ? clubs : activeOfferings.map((o) => ({ id: o.id, name: o.name, code: o.clubCode, description: "" }));
             return (
               <div style={styles.joinGrid}>
-                {activeOfferings.map((offering) => (
-                  <div key={offering.id} style={styles.joinCard}>
-                    <div style={styles.productTitle}>{offering.name}</div>
-                    <div style={styles.productDesc}>
-                      {offering.description || `${offering.clubCode} Club • ${offering.year} membership`}
-                    </div>
-                    {typeof offering.year === "number" && (
-                      <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
-                        {offering.year} membership
+                {clubsToShow.map((club) => {
+                  const offering = offeringsByClub.get((club.code || "").toUpperCase());
+                  if (!offering) {
+                    return (
+                      <div key={club.id} style={styles.joinCard}>
+                        <div style={styles.productTitle}>{club.name}</div>
+                        <div style={styles.productDesc}>{club.description || `${club.code} Club`}</div>
+                        <p style={{ fontSize: 13, color: "#8a8cab", marginTop: 8, marginBottom: 0 }}>
+                          No membership offering available yet. Contact the brewery to join.
+                        </p>
                       </div>
-                    )}
-                    <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
-                      {formatUSD(offering.priceCents)}
+                    );
+                  }
+                  return (
+                    <div key={offering.id} style={styles.joinCard}>
+                      <div style={styles.productTitle}>{offering.name}</div>
+                      <div style={styles.productDesc}>
+                        {offering.description || `${offering.clubCode} Club • ${offering.year} membership`}
+                      </div>
+                      {typeof offering.year === "number" && (
+                        <div style={{ fontSize: 12, color: "#8a8cab", marginTop: 4 }}>
+                          {offering.year} membership
+                        </div>
+                      )}
+                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800 }}>
+                        {formatUSD(offering.priceCents)}
+                      </div>
+                      <button
+                        type="button"
+                        style={styles.primaryBtn}
+                        onClick={() => startCheckout(offering.id)}
+                        disabled={offering.priceCents <= 0}
+                      >
+                        Purchase membership
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      style={styles.primaryBtn}
-                      onClick={() => startCheckout(offering.id)}
-                      disabled={offering.priceCents <= 0}
-                    >
-                      Purchase membership
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })()}
+          {isGuest && (
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #262637" }}>
             <p style={{ fontSize: 12, color: "#8a8cab", marginBottom: 8 }}>
               Don&apos;t have an account yet?
@@ -1421,6 +1442,7 @@ export const MemberPreview: React.FC = () => {
               </button>
             )}
           </div>
+          )}
         </section>
       ) : (
         <section style={styles.card}>
