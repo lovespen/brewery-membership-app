@@ -65,7 +65,7 @@ model MembershipOffering {
   priceCents        Int      @default(0)
   taxRateId         String?
   toastDiscountCode String
-  /// JSON array of club codes allowed to purchase; empty or null = primary club only
+  /// JSON array of club codes: only existing members of these clubs can purchase (e.g. upgrades). Empty = anyone can purchase (first-time).
   allowedClubCodes  Json?    @default("[]")
 
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)

@@ -39,6 +39,7 @@ type MembershipOffering = {
   year: number;
   priceCents: number;
   isActive: boolean;
+  allowedClubCodes?: string[];
   saleStartAt?: string | null;
   saleEndAt?: string | null;
   capacity?: number;
@@ -698,6 +699,7 @@ export const MemberPreview: React.FC = () => {
             items,
             membershipId: membershipId || undefined,
             memberClubCode,
+            memberClubCodes: member.clubs,
             memberId,
             tipCents: tip
           })
@@ -1344,7 +1346,13 @@ export const MemberPreview: React.FC = () => {
           </p>
           {(() => {
             const activeOfferings = memberships.filter((m) => m.isActive);
-            if (activeOfferings.length === 0) {
+            const memberClubCodes = member.clubs;
+            const visibleOfferings = activeOfferings.filter((offering) => {
+              const allowed = offering.allowedClubCodes ?? [];
+              if (allowed.length === 0) return true;
+              return memberClubCodes.some((c) => allowed.includes(c));
+            });
+            if (visibleOfferings.length === 0) {
               return (
                 <div style={{ padding: "1rem 0" }}>
                   <p style={{ fontSize: 13, color: "#8a8cab", margin: 0 }}>
@@ -1355,7 +1363,7 @@ export const MemberPreview: React.FC = () => {
             }
             return (
               <div style={styles.joinGrid}>
-                {activeOfferings.map((offering) => (
+                {visibleOfferings.map((offering) => (
                   <JoinClubCard
                     key={offering.id}
                     offering={offering}

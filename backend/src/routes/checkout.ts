@@ -108,6 +108,18 @@ export function registerCheckoutRoutes(router: IRouter) {
       if (!offering || !offering.isActive) {
         return res.status(400).json({ error: "Invalid or inactive membership" });
       }
+      const allowed = offering.allowedClubCodes ?? [];
+      if (allowed.length > 0) {
+        const memberClubs = Array.isArray(req.body.memberClubCodes)
+          ? (req.body.memberClubCodes as string[]).map((c: string) => (c || "").toUpperCase())
+          : clubCode ? [clubCode] : [];
+        const hasAccess = memberClubs.some((c: string) => allowed.includes(c));
+        if (!hasAccess) {
+          return res.status(403).json({
+            error: "This membership is only available to existing members of certain clubs (e.g. renewal or upgrade)."
+          });
+        }
+      }
       membershipCents = offering.priceCents;
     }
 

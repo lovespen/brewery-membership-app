@@ -160,7 +160,7 @@ export function registerMembershipRoutes(router: IRouter) {
       const allowed = (allowedClubsBody as string[])
         .map((c) => (c || "").toString().trim().toUpperCase())
         .filter((c) => validCodes.includes(c));
-      data.allowedClubCodes = allowed.length > 0 ? allowed : [existing.club.code];
+      data.allowedClubCodes = allowed;
     }
     if (typeof isActive === "boolean") data.isActive = isActive;
     if (typeof clubCode === "string" && clubCode.trim()) {
@@ -216,7 +216,7 @@ export function registerMembershipRoutes(router: IRouter) {
       ? (allowedClubsBody as string[])
           .map((c: string) => (c || "").toString().trim().toUpperCase())
           .filter((c: string) => validCodes.includes(c))
-      : [code];
+      : [];
     const toastCode =
       typeof toastDiscountCode === "string" && toastDiscountCode.trim()
         ? String(toastDiscountCode).trim()

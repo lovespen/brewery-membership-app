@@ -732,7 +732,7 @@ export const App: React.FC = () => {
       })(),
       taxRateId: membershipTaxRateId && membershipTaxRateId.trim() !== "" ? membershipTaxRateId.trim() : null,
       toastDiscountCode: membershipToastDiscountCode.trim() || undefined,
-      allowedClubCodes: membershipAllowedClubs.length > 0 ? membershipAllowedClubs : undefined
+      allowedClubCodes: membershipAllowedClubs
     };
     setMembershipSaving(true);
     try {
@@ -2915,9 +2915,9 @@ export const App: React.FC = () => {
                   </div>
                 </label>
                 <fieldset style={{ gridColumn: "1 / -1", border: "1px solid #262637", borderRadius: 12, padding: "0.75rem 0.9rem" }}>
-                  <legend style={{ fontSize: 12, color: "#a3a3bf" }}>Available to specific clubs</legend>
+                  <legend style={{ fontSize: 12, color: "#a3a3bf" }}>Available only to existing members of these clubs (e.g. upgrades)</legend>
                   <p style={{ fontSize: 11, color: "#8a8cab", marginTop: 0, marginBottom: 10 }}>
-                    Only these clubs can see and purchase this membership. Options reflect clubs used in the app. Leave all unchecked to allow only the primary club (selected above).
+                    Check clubs whose existing members can see and purchase this membership (e.g. renewal or upgrade). Leave all unchecked for first-time memberships that anyone can purchase.
                   </p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                     {(clubsFromApi ?? []).map((club) => (
