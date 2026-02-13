@@ -22,6 +22,7 @@ import { registerReportRoutes } from "./routes/reports";
 import { handleStripeWebhook } from "./routes/webhooks";
 import { ensureDevUser } from "./routes/users";
 import { ensureDefaultClubs } from "./routes/clubs";
+import { loadConfigFromDb, ensureDefaultTaxRates } from "./routes/config";
 
 const app = express();
 
@@ -75,6 +76,8 @@ app.use("/api", apiRouter);
 const port = process.env.PORT || 4000;
 ensureDevUser()
   .then(() => ensureDefaultClubs().then(() => {}))
+  .then(() => ensureDefaultTaxRates())
+  .then(() => loadConfigFromDb())
   .then(() => {
     app.listen(port, () => {
       // eslint-disable-next-line no-console

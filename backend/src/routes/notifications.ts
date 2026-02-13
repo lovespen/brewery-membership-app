@@ -2,6 +2,7 @@ import type { IRouter } from "express";
 import { Request, Response } from "express";
 import webpush from "web-push";
 import { getClubCodes } from "./clubs";
+import { prisma } from "../db";
 
 type ClubCode = string;
 
@@ -20,9 +21,6 @@ type PushSubscriptionRecord = {
   keys: { auth: string; p256dh: string };
   clubCodes: ClubCode[];
 };
-
-const notifications: PushNotification[] = [];
-const pushSubscriptions: PushSubscriptionRecord[] = [];
 
 let vapidPublicKey!: string;
 let vapidPrivateKey!: string;
@@ -51,14 +49,24 @@ webpush.setVapidDetails(
   vapidPrivateKey
 );
 
-function nextId() {
-  return `notif_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+async function getSubscriptionsFromDb(): Promise<PushSubscriptionRecord[]> {
+  const list = await prisma.pushSubscription.findMany();
+  return list.map((s) => ({
+    endpoint: s.endpoint,
+    keys: { auth: s.keysAuth, p256dh: s.keysP256dh },
+    clubCodes: (s.clubCodes as string[]) || []
+  }));
+}
+
+async function deleteSubscriptionsByEndpoints(endpoints: string[]): Promise<void> {
+  if (endpoints.length === 0) return;
+  await prisma.pushSubscription.deleteMany({ where: { endpoint: { in: endpoints } } });
 }
 
 async function deliverNotification(
   notification: PushNotification,
   targets: PushSubscriptionRecord[]
-): Promise<{ sentTo: number; failed: number }> {
+): Promise<{ sentTo: number; failed: number; failedEndpoints: string[] }> {
   const payload = JSON.stringify({
     title: notification.title,
     body: notification.body,
@@ -84,24 +92,36 @@ async function deliverNotification(
       }
     }
   }
-  for (const ep of failedEndpoints) {
-    const idx = pushSubscriptions.findIndex((s) => s.endpoint === ep);
-    if (idx >= 0) pushSubscriptions.splice(idx, 1);
-  }
-  return { sentTo: targets.length, failed: failedEndpoints.length };
+  await deleteSubscriptionsByEndpoints(failedEndpoints);
+  return { sentTo: targets.length, failed: failedEndpoints.length, failedEndpoints };
 }
 
-function runScheduledCheck() {
-  const now = Date.now();
-  for (const n of notifications) {
-    if (n.status !== "scheduled" || !n.scheduledFor) continue;
-    if (new Date(n.scheduledFor).getTime() > now) continue;
-    const targets = pushSubscriptions.filter((sub) =>
-      sub.clubCodes.some((c) => n.clubCodes.includes(c))
+async function runScheduledCheck(): Promise<void> {
+  const now = new Date();
+  const due = await prisma.pushNotification.findMany({
+    where: { status: "scheduled", scheduledFor: { lte: now } }
+  });
+  const subs = await getSubscriptionsFromDb();
+  for (const n of due) {
+    const clubCodes = (n.clubCodes as string[]) || [];
+    const targets = subs.filter((sub) =>
+      (sub.clubCodes as string[]).some((c: string) => clubCodes.includes(c))
     );
-    deliverNotification(n, targets).then(() => {
-      n.status = "sent";
-      n.sentAt = new Date().toISOString();
+    await deliverNotification(
+      {
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        clubCodes,
+        status: "sent",
+        scheduledFor: n.scheduledFor?.toISOString() ?? null,
+        sentAt: new Date().toISOString()
+      },
+      targets
+    );
+    await prisma.pushNotification.update({
+      where: { id: n.id },
+      data: { status: "sent", sentAt: new Date() }
     });
   }
 }
@@ -109,16 +129,26 @@ function runScheduledCheck() {
 const SCHEDULE_CHECK_MS = 60 * 1000;
 let scheduleInterval: ReturnType<typeof setInterval> | null = null;
 
+function toNotificationPayload(n: { id: string; title: string; body: string; clubCodes: unknown; status: string; scheduledFor: Date | null; sentAt: Date | null }): PushNotification {
+  return {
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    clubCodes: (n.clubCodes as ClubCode[]) || [],
+    status: n.status as "scheduled" | "sent",
+    scheduledFor: n.scheduledFor?.toISOString() ?? null,
+    sentAt: n.sentAt?.toISOString() ?? null
+  };
+}
+
 export function registerNotificationRoutes(router: IRouter) {
   if (!scheduleInterval) {
-    scheduleInterval = setInterval(runScheduledCheck, SCHEDULE_CHECK_MS);
+    scheduleInterval = setInterval(() => void runScheduledCheck(), SCHEDULE_CHECK_MS);
   }
-  // GET /api/push/vapid-public-key - client uses this to subscribe
   router.get("/push/vapid-public-key", (_req: Request, res: Response) => {
     res.json({ publicKey: vapidPublicKey });
   });
 
-  // POST /api/push-subscriptions - register a push subscription (from member app)
   router.post("/push-subscriptions", async (req: Request, res: Response) => {
     const { subscription, clubCodes: clubCodesBody } = req.body;
 
@@ -146,63 +176,64 @@ export function registerNotificationRoutes(router: IRouter) {
       });
     }
 
-    const record: PushSubscriptionRecord = {
-      endpoint: subscription.endpoint,
-      keys: { auth: keys.auth, p256dh: keys.p256dh },
-      clubCodes
-    };
-
-    const existing = pushSubscriptions.findIndex((s) => s.endpoint === record.endpoint);
-    if (existing >= 0) {
-      pushSubscriptions[existing] = record;
+    const endpoint = subscription.endpoint as string;
+    const existing = await prisma.pushSubscription.findFirst({ where: { endpoint } });
+    if (existing) {
+      await prisma.pushSubscription.update({
+        where: { id: existing.id },
+        data: { keysAuth: keys.auth, keysP256dh: keys.p256dh, clubCodes: clubCodes as unknown as object }
+      });
     } else {
-      pushSubscriptions.push(record);
+      await prisma.pushSubscription.create({
+        data: {
+          endpoint,
+          keysAuth: keys.auth,
+          keysP256dh: keys.p256dh,
+          clubCodes: clubCodes as unknown as object
+        }
+      });
     }
 
     res.status(201).json({ ok: true });
   });
 
-  // GET /api/notifications - list notifications (sent and scheduled)
-  router.get("/notifications", (_req: Request, res: Response) => {
-    res.json(
-      [...notifications].sort((a, b) => {
-        const aTime = a.status === "scheduled" && a.scheduledFor
-          ? new Date(a.scheduledFor).getTime()
-          : new Date(a.sentAt || 0).getTime();
-        const bTime = b.status === "scheduled" && b.scheduledFor
-          ? new Date(b.scheduledFor).getTime()
-          : new Date(b.sentAt || 0).getTime();
-        return bTime - aTime;
-      })
-    );
+  router.get("/notifications", async (_req: Request, res: Response) => {
+    const list = await prisma.pushNotification.findMany({
+      orderBy: [{ status: "asc" }, { scheduledFor: "desc" }, { sentAt: "desc" }]
+    });
+    const sorted = list.slice().sort((a, b) => {
+      const aTime = a.status === "scheduled" && a.scheduledFor
+        ? a.scheduledFor.getTime()
+        : (a.sentAt?.getTime() ?? 0);
+      const bTime = b.status === "scheduled" && b.scheduledFor
+        ? b.scheduledFor.getTime()
+        : (b.sentAt?.getTime() ?? 0);
+      return bTime - aTime;
+    });
+    res.json(sorted.map(toNotificationPayload));
   });
 
-  // DELETE /api/notifications/:id - cancel a scheduled notification
-  router.delete("/notifications/:id", (req: Request, res: Response) => {
-    const n = notifications.find((x) => x.id === req.params.id);
+  router.delete("/notifications/:id", async (req: Request, res: Response) => {
+    const n = await prisma.pushNotification.findUnique({ where: { id: req.params.id } });
     if (!n) {
       return res.status(404).json({ error: "Notification not found" });
     }
     if (n.status !== "scheduled") {
       return res.status(400).json({ error: "Only scheduled notifications can be cancelled" });
     }
-    const idx = notifications.indexOf(n);
-    notifications.splice(idx, 1);
+    await prisma.pushNotification.delete({ where: { id: req.params.id } });
     res.status(204).send();
   });
 
-  // POST /api/notifications - create/send now or schedule a push notification
   router.post("/notifications", async (req: Request, res: Response) => {
     const { title, body, clubCodes: clubCodesBody, scheduledFor: scheduledForBody } = req.body;
 
-    const titleStr =
-      typeof title === "string" && title.trim() ? title.trim() : "";
+    const titleStr = typeof title === "string" && title.trim() ? title.trim() : "";
     if (!titleStr) {
       return res.status(400).json({ error: "title is required" });
     }
 
-    const bodyStr =
-      typeof body === "string" ? body : "";
+    const bodyStr = typeof body === "string" ? body : "";
 
     const validCodesNotif = await getClubCodes();
     const clubCodes: ClubCode[] = Array.isArray(clubCodesBody)
@@ -225,17 +256,18 @@ export function registerNotificationRoutes(router: IRouter) {
         : NaN;
     const isScheduled = !Number.isNaN(scheduledForMs) && scheduledForMs > Date.now();
 
-    const notification: PushNotification = {
-      id: nextId(),
-      title: titleStr,
-      body: bodyStr,
-      clubCodes,
-      status: isScheduled ? "scheduled" : "sent",
-      scheduledFor: isScheduled ? new Date(scheduledForMs).toISOString() : null,
-      sentAt: isScheduled ? null : new Date().toISOString()
-    };
+    const created = await prisma.pushNotification.create({
+      data: {
+        title: titleStr,
+        body: bodyStr,
+        clubCodes: clubCodes as unknown as object,
+        status: isScheduled ? "scheduled" : "sent",
+        scheduledFor: isScheduled ? new Date(scheduledForMs) : null,
+        sentAt: isScheduled ? null : new Date()
+      }
+    });
 
-    notifications.push(notification);
+    const notification = toNotificationPayload(created);
 
     if (isScheduled) {
       return res.status(201).json({
@@ -244,8 +276,9 @@ export function registerNotificationRoutes(router: IRouter) {
       });
     }
 
-    const targets = pushSubscriptions.filter((sub) =>
-      sub.clubCodes.some((c) => clubCodes.includes(c))
+    const subs = await getSubscriptionsFromDb();
+    const targets = subs.filter((sub) =>
+      (sub.clubCodes as string[]).some((c: string) => clubCodes.includes(c))
     );
     const result = await deliverNotification(notification, targets);
 

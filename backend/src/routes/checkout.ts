@@ -12,10 +12,10 @@ import {
   getStripeAchDefaultThresholdCents
 } from "./config";
 
-function computeCartTotal(
+async function computeCartTotal(
   cartItems: { productId: string; quantity: number }[],
   memberClubCode?: ClubCode
-): { subtotalCents: number; taxCents: number; totalCents: number; taxByRateId: Record<string, number> } {
+): Promise<{ subtotalCents: number; taxCents: number; totalCents: number; taxByRateId: Record<string, number> }> {
   let subtotalCents = 0;
   const taxByRateId: Record<string, number> = {};
   for (const { productId, quantity } of cartItems) {
@@ -25,7 +25,7 @@ function computeCartTotal(
     const lineTotal = price * quantity;
     subtotalCents += lineTotal;
     if (product.taxRateId) {
-      const rate = getTaxRateById(product.taxRateId);
+      const rate = await getTaxRateById(product.taxRateId);
       if (rate) {
         const lineTax = Math.round((lineTotal * rate.ratePercent) / 100);
         taxByRateId[product.taxRateId] = (taxByRateId[product.taxRateId] ?? 0) + lineTax;
@@ -91,7 +91,7 @@ export function registerCheckoutRoutes(router: IRouter) {
     let subtotalCents = 0;
     let taxCents = 0;
 
-    const cartTotal = computeCartTotal(
+    const cartTotal = await computeCartTotal(
       validItems.map((i: { productId: string; quantity: number }) => ({
         productId: i.productId,
         quantity: i.quantity

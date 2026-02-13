@@ -5,7 +5,7 @@ import { getTaxRateById } from "./config";
 
 export function registerReportRoutes(router: IRouter) {
   // GET /api/reports/sales-tax?month=YYYY-MM - monthly sales tax summary for reporting
-  router.get("/reports/sales-tax", (req: Request, res: Response) => {
+  router.get("/reports/sales-tax", async (req: Request, res: Response) => {
     const month = (req.query.month as string) || "";
     const match = /^\d{4}-\d{2}$/.exec(month);
     if (!match) {
@@ -21,16 +21,18 @@ export function registerReportRoutes(router: IRouter) {
         byRateId[taxRateId].transactionCount += 1;
       }
     }
-    const taxRatesList = Object.entries(byRateId).map(([taxRateId, agg]) => {
-      const rate = getTaxRateById(taxRateId);
-      return {
-        taxRateId,
-        taxRateName: rate?.name ?? taxRateId,
-        ratePercent: rate?.ratePercent ?? 0,
-        totalTaxCents: agg.totalTaxCents,
-        transactionCount: agg.transactionCount
-      };
-    });
+    const taxRatesList = await Promise.all(
+      Object.entries(byRateId).map(async ([taxRateId, agg]) => {
+        const rate = await getTaxRateById(taxRateId);
+        return {
+          taxRateId,
+          taxRateName: rate?.name ?? taxRateId,
+          ratePercent: rate?.ratePercent ?? 0,
+          totalTaxCents: agg.totalTaxCents,
+          transactionCount: agg.transactionCount
+        };
+      })
+    );
     const totalTaxCents = taxRatesList.reduce((s, r) => s + r.totalTaxCents, 0);
     res.json({
       month,

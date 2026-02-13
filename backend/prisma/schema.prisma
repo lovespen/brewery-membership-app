@@ -207,3 +207,46 @@ model ToastClubPromoCode {
   club Club @relation(fields: [clubId], references: [id])
 }
 
+/// Tip pool withdrawals (persisted)
+model TipWithdrawal {
+  id           String   @id @default(uuid())
+  amountCents  Int
+  withdrawnAt  DateTime @default(now())
+  note         String?
+}
+
+/// Push notifications (scheduled or sent) - persisted
+model PushNotification {
+  id          String   @id @default(uuid())
+  title       String
+  body        String
+  clubCodes   Json     // array of strings
+  status      String   // scheduled | sent
+  scheduledFor DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+}
+
+/// Push subscription endpoints for web push (persisted)
+model PushSubscription {
+  id        String   @id @default(uuid())
+  endpoint  String
+  keysAuth  String   @map("keys_auth")
+  keysP256dh String  @map("keys_p256dh")
+  clubCodes Json     // array of strings
+  createdAt DateTime @default(now())
+}
+
+/// Product allocation (club or specific members) - persisted
+model Allocation {
+  id                String   @id @default(uuid())
+  productId         String
+  quantityPerPerson  Int
+  targetType         String   // club | members
+  clubCode           String?
+  memberIds         Json     // array of strings
+  pullFromInventory  Boolean  @default(false)
+  totalQuantity     Int
+  createdAt         DateTime @default(now())
+}
+

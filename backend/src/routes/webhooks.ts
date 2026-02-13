@@ -30,7 +30,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object as Stripe.PaymentIntent;
     const tipCents = parseInt(pi.metadata?.tipCents || "0", 10);
-    if (tipCents > 0) addTipCents(tipCents);
+    if (tipCents > 0) await addTipCents(tipCents);
     const taxBreakdownRaw = pi.metadata?.taxBreakdown;
     if (taxBreakdownRaw && typeof taxBreakdownRaw === "string") {
       try {

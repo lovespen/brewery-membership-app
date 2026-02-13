@@ -1,7 +1,6 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
-
-let availableTipCents = 0;
+import { prisma } from "../db";
 
 export type TipWithdrawal = {
   id: string;
@@ -10,58 +9,81 @@ export type TipWithdrawal = {
   note: string | null;
 };
 
-const withdrawals: TipWithdrawal[] = [];
+const CONFIG_KEY_TIPS_BALANCE = "tipsAvailableCents";
 
-function nextId() {
-  return `tw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+async function getBalance(): Promise<number> {
+  const row = await prisma.config.findUnique({ where: { key: CONFIG_KEY_TIPS_BALANCE } });
+  if (!row || typeof (row.value as number) !== "number") return 0;
+  return Math.max(0, Math.floor((row.value as number)));
 }
 
 /** Add tip amount to the pool (e.g. from webhook when payment succeeds). */
-export function addTipCents(amountCents: number): void {
-  if (typeof amountCents === "number" && amountCents > 0) {
-    availableTipCents += Math.floor(amountCents);
-  }
+export async function addTipCents(amountCents: number): Promise<void> {
+  if (typeof amountCents !== "number" || amountCents <= 0) return;
+  const add = Math.floor(amountCents);
+  const current = await getBalance();
+  await prisma.config.upsert({
+    where: { key: CONFIG_KEY_TIPS_BALANCE },
+    create: { key: CONFIG_KEY_TIPS_BALANCE, value: current + add },
+    update: { value: current + add }
+  });
 }
 
 export function getAvailableTipCents(): number {
-  return availableTipCents;
+  return 0;
+}
+
+export async function getAvailableTipCentsAsync(): Promise<number> {
+  return getBalance();
 }
 
 export function registerTipRoutes(router: IRouter) {
-  // GET /api/tips - balance and withdrawal history (managers)
-  router.get("/tips", (_req: Request, res: Response) => {
-    res.json({
-      availableCents: availableTipCents,
-      withdrawals: [...withdrawals].sort(
-        (a, b) => new Date(b.withdrawnAt).getTime() - new Date(a.withdrawnAt).getTime()
-      )
-    });
+  router.get("/tips", async (_req: Request, res: Response) => {
+    const [availableCents, list] = await Promise.all([
+      getBalance(),
+      prisma.tipWithdrawal.findMany({ orderBy: { withdrawnAt: "desc" } })
+    ]);
+    const withdrawals: TipWithdrawal[] = list.map((w) => ({
+      id: w.id,
+      amountCents: w.amountCents,
+      withdrawnAt: w.withdrawnAt.toISOString(),
+      note: w.note
+    }));
+    res.json({ availableCents, withdrawals });
   });
 
-  // POST /api/tips/withdraw - pull tips out (managers)
-  router.post("/tips/withdraw", (req: Request, res: Response) => {
+  router.post("/tips/withdraw", async (req: Request, res: Response) => {
     const { amountCents, note } = req.body;
     const amount = typeof amountCents === "number" ? Math.floor(amountCents) : Math.floor(Number(amountCents) || 0);
     if (amount <= 0) {
       return res.status(400).json({ error: "amountCents must be a positive number" });
     }
-    if (amount > availableTipCents) {
+    const available = await getBalance();
+    if (amount > available) {
       return res.status(400).json({
         error: "Insufficient tip balance",
-        availableCents: availableTipCents
+        availableCents: available
       });
     }
-    availableTipCents -= amount;
-    const record: TipWithdrawal = {
-      id: nextId(),
-      amountCents: amount,
-      withdrawnAt: new Date().toISOString(),
-      note: typeof note === "string" && note.trim() ? note.trim() : null
-    };
-    withdrawals.push(record);
+    const noteStr = typeof note === "string" && note.trim() ? note.trim() : null;
+    const [withdrawal] = await prisma.$transaction([
+      prisma.tipWithdrawal.create({
+        data: { amountCents: amount, note: noteStr }
+      }),
+      prisma.config.upsert({
+        where: { key: CONFIG_KEY_TIPS_BALANCE },
+        create: { key: CONFIG_KEY_TIPS_BALANCE, value: available - amount },
+        update: { value: available - amount }
+      })
+    ]);
     res.status(201).json({
-      withdrawal: record,
-      availableCents: availableTipCents
+      withdrawal: {
+        id: withdrawal.id,
+        amountCents: withdrawal.amountCents,
+        withdrawnAt: withdrawal.withdrawnAt.toISOString(),
+        note: withdrawal.note
+      },
+      availableCents: available - amount
     });
   });
 }

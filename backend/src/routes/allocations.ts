@@ -5,10 +5,11 @@ import { getClubCodes } from "./clubs";
 import { getProductById, decrementProductInventory } from "./products";
 import { getMembersByClub, getMemberIdsExist } from "./members";
 import { addEntitlements } from "../stores/entitlements";
+import { prisma } from "../db";
 
 type AllocationTargetType = "club" | "members";
 
-type InMemoryAllocation = {
+type AllocationPayload = {
   id: string;
   productId: string;
   quantityPerPerson: number;
@@ -20,10 +21,18 @@ type InMemoryAllocation = {
   createdAt: string;
 };
 
-const allocations: InMemoryAllocation[] = [];
-
-function nextId(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+function toAllocationPayload(row: { id: string; productId: string; quantityPerPerson: number; targetType: string; clubCode: string | null; memberIds: unknown; pullFromInventory: boolean; totalQuantity: number; createdAt: Date }): AllocationPayload {
+  return {
+    id: row.id,
+    productId: row.productId,
+    quantityPerPerson: row.quantityPerPerson,
+    targetType: row.targetType as AllocationTargetType,
+    clubCode: row.clubCode ?? undefined,
+    memberIds: (row.memberIds as string[]) ?? [],
+    pullFromInventory: row.pullFromInventory,
+    totalQuantity: row.totalQuantity,
+    createdAt: row.createdAt.toISOString()
+  };
 }
 
 function addOrderedNotPickedUp(productId: string, quantity: number) {
@@ -33,14 +42,14 @@ function addOrderedNotPickedUp(productId: string, quantity: number) {
 
 export function registerAllocationRoutes(router: IRouter) {
   // GET /api/products/:productId/allocations - list allocations for a product
-  router.get("/products/:productId/allocations", (req: Request, res: Response) => {
+  router.get("/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
     const product = getProductById(productId);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
-    const list = allocations.filter((a) => a.productId === productId);
-    res.json(list);
+    const list = await prisma.allocation.findMany({ where: { productId }, orderBy: { createdAt: "desc" } });
+    res.json(list.map(toAllocationPayload));
   });
 
   // POST /api/products/:productId/allocations - create allocation (admin)
@@ -117,20 +126,19 @@ export function registerAllocationRoutes(router: IRouter) {
       }
     }
 
-    const allocation: InMemoryAllocation = {
-      id: nextId("alloc"),
-      productId,
-      quantityPerPerson: qty,
-      targetType,
-      memberIds: [...memberIds],
-      pullFromInventory,
-      totalQuantity,
-      createdAt: new Date().toISOString()
-    };
-    if (target === "club") {
-      allocation.clubCode = (bodyClubCode || "").toUpperCase() as ClubCode;
-    }
-    allocations.push(allocation);
+    const clubCodeVal = target === "club" ? ((bodyClubCode || "").toString().trim().toUpperCase() as ClubCode) : null;
+    const created = await prisma.allocation.create({
+      data: {
+        productId,
+        quantityPerPerson: qty,
+        targetType,
+        clubCode: clubCodeVal,
+        memberIds: memberIds as unknown as object,
+        pullFromInventory,
+        totalQuantity
+      }
+    });
+    const allocation = toAllocationPayload(created);
 
     const isPreorderAllocation = product.isPreorder && product.releaseAt;
     const status = isPreorderAllocation ? ("NOT_READY" as const) : ("READY_FOR_PICKUP" as const);
