@@ -2575,6 +2575,38 @@ export const App: React.FC = () => {
                   </div>
                 </div>
               ) : (
+                <>
+                {((): boolean => {
+                  const defaultCodes = ["WOOD", "SAP", "CELLARS", "FOUNDERS"];
+                  const existingCodes = (clubsFromApi ?? []).map((c) => c.code.toUpperCase());
+                  return defaultCodes.some((code) => !existingCodes.includes(code));
+                })() ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, color: "#8a8cab", marginTop: 0, marginBottom: 8 }}>
+                      Add the remaining default clubs (Cellars, Founders) so all four are available.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={clubsSeeding}
+                      onClick={async () => {
+                        setClubsSeeding(true);
+                        try {
+                          const res = await apiRequest("/api/clubs/seed-defaults", { method: "POST" });
+                          if (res.ok) {
+                            const data = await res.json();
+                            if (data.clubs) setClubsFromApi(data.clubs);
+                            else await loadClubs();
+                          } else await loadClubs();
+                        } finally {
+                          setClubsSeeding(false);
+                        }
+                      }}
+                      style={{ padding: "0.4rem 0.8rem", fontSize: 13, cursor: clubsSeeding ? "wait" : "pointer", borderRadius: 8, border: "1px solid #262637", background: "#17172b", color: "#e5e7ff" }}
+                    >
+                      {clubsSeeding ? "Adding…" : "Add missing default clubs"}
+                    </button>
+                  </div>
+                ) : null}
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, border: "1px solid #262637", borderRadius: 12, overflow: "hidden" }}>
                   {clubsFromApi.map((club) => (
                     <li
@@ -2711,6 +2743,7 @@ export const App: React.FC = () => {
                     </li>
                   ))}
                 </ul>
+                </>
               )}
             </section>
         )}
