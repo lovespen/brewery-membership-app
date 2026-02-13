@@ -940,6 +940,23 @@ export const App: React.FC = () => {
               borderRadius: 999,
               padding: "0.5rem 0.9rem",
               background:
+                view === "clubs"
+                  ? "rgba(86, 119, 252, 0.18)"
+                  : "transparent",
+              color: view === "clubs" ? "#f5f5f7" : "#a3a3bf",
+              cursor: "pointer"
+            }}
+            onClick={() => setView("clubs")}
+          >
+            Clubs (active clubs)
+          </button>
+          <button
+            style={{
+              textAlign: "left",
+              border: "none",
+              borderRadius: 999,
+              padding: "0.5rem 0.9rem",
+              background:
                 view === "manageMemberships"
                   ? "rgba(86, 119, 252, 0.18)"
                   : "transparent",
