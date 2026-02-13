@@ -39,29 +39,29 @@ export function getAuthToken(req: Request): string | null {
   return null;
 }
 
-/** Routes that do not require admin (member app, webhooks, public read). */
+/** Routes that do not require admin. Path is relative to /api when called from app.use("/api", ...). */
 export function isPublicApiRoute(method: string, path: string): boolean {
   const publicList: [string, string][] = [
-    ["POST", "/api/register"],
-    ["GET", "/api/auth/me"],
-    ["POST", "/api/auth/login"],
-    ["POST", "/api/auth/logout"],
-    ["POST", "/api/auth/change-password"],
-    ["POST", "/api/webhooks/stripe"],
-    ["GET", "/api/products"],
-    ["GET", "/api/clubs"],
-    ["GET", "/api/config/membership-year"],
-    ["GET", "/api/config/tip-percentages"]
+    ["POST", "/register"],
+    ["GET", "/auth/me"],
+    ["POST", "/auth/login"],
+    ["POST", "/auth/logout"],
+    ["POST", "/auth/change-password"],
+    ["POST", "/webhooks/stripe"],
+    ["GET", "/products"],
+    ["GET", "/clubs"],
+    ["GET", "/config/membership-year"],
+    ["GET", "/config/tip-percentages"]
   ];
   if (publicList.some(([m, p]) => m === method && p === path)) return true;
-  if (method === "GET" && /^\/api\/members\/[^/]+\/entitlements$/.test(path)) return true;
-  if (method === "GET" && path === "/api/cart") return true;
-  if (method === "POST" && path === "/api/cart/items") return true;
-  if (method === "DELETE" && path.startsWith("/api/cart/items/")) return true;
-  if (method === "POST" && path === "/api/cart/clear") return true;
-  if (method === "POST" && path === "/api/checkout/create-payment-intent") return true;
-  if (method === "GET" && path === "/api/push/vapid-public-key") return true;
-  if (method === "POST" && path === "/api/push-subscriptions") return true;
+  if (method === "GET" && /^\/members\/[^/]+\/entitlements$/.test(path)) return true;
+  if (method === "GET" && path === "/cart") return true;
+  if (method === "POST" && path === "/cart/items") return true;
+  if (method === "DELETE" && path.startsWith("/cart/items/")) return true;
+  if (method === "POST" && path === "/cart/clear") return true;
+  if (method === "POST" && path === "/checkout/create-payment-intent") return true;
+  if (method === "GET" && path === "/push/vapid-public-key") return true;
+  if (method === "POST" && path === "/push-subscriptions") return true;
   return false;
 }
 
