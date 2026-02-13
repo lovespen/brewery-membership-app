@@ -1348,9 +1348,13 @@ export const MemberPreview: React.FC = () => {
             const activeOfferings = memberships.filter((m) => m.isActive);
             const memberClubCodes = member.clubs;
             const visibleOfferings = activeOfferings.filter((offering) => {
-              const allowed = offering.allowedClubCodes ?? [];
-              if (allowed.length === 0) return true;
-              return memberClubCodes.some((c) => allowed.includes(c));
+              const allowed = Array.isArray(offering.allowedClubCodes) ? offering.allowedClubCodes : [];
+              const isFirstTime =
+                allowed.length === 0 ||
+                (allowed.length === 1 && allowed[0] === offering.clubCode);
+              if (!isFirstTime && !memberClubCodes.some((c) => allowed.includes(c))) return false;
+              if (memberClubCodes.includes(offering.clubCode)) return false;
+              return true;
             });
             if (visibleOfferings.length === 0) {
               return (
