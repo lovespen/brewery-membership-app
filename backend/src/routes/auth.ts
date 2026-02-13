@@ -66,6 +66,7 @@ export function isPublicApiRoute(method: string, path: string): boolean {
     ["POST", "/webhooks/stripe"],
     ["GET", "/products"],
     ["GET", "/clubs"],
+    ["GET", "/memberships"],
     ["GET", "/config/membership-year"],
     ["GET", "/config/tip-percentages"]
   ];
