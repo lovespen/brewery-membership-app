@@ -93,7 +93,7 @@ export async function fixClubDescriptionsNoCombination(): Promise<void> {
     const club = await prisma.club.findFirst({
       where: { code: { equals: code, mode: "insensitive" } }
     });
-    if (club && club.description.toLowerCase().includes("combination")) {
+    if (club && (club.description ?? "").toLowerCase().includes("combination")) {
       await prisma.club.update({
         where: { id: club.id },
         data: { description }
