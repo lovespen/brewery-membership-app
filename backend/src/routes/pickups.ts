@@ -26,7 +26,7 @@ type PickupRow = {
 };
 
 async function resolveDisplayName(userId: string): Promise<{ name: string | null; email: string | null }> {
-  const member = getMemberById(userId);
+  const member = await getMemberById(userId);
   if (member) return { name: member.name ?? null, email: member.email ?? null };
   const user = await getUserById(userId);
   if (user) return { name: user.name ?? null, email: user.email ?? null };
@@ -67,7 +67,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
   router.get("/pickups/by-member/:memberId", async (req: Request, res: Response) => {
     promotePreordersToReady();
     const { memberId } = req.params;
-    const memberFromList = getMemberById(memberId);
+    const memberFromList = await getMemberById(memberId);
     const memberRecord = memberFromList ?? await getUserById(memberId);
     if (!memberRecord) {
       res.status(404).json({ error: "Member not found" });

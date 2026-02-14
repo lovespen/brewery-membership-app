@@ -39,7 +39,36 @@ async function addOrderedNotPickedUp(productId: string, quantity: number) {
   await incrementOrderedNotPickedUp(productId, quantity);
 }
 
+type AllocationListRow = AllocationPayload & { productName: string };
+
 export function registerAllocationRoutes(router: IRouter) {
+  // GET /api/allocations - list all allocations (for admin management)
+  router.get("/allocations", async (_req: Request, res: Response) => {
+    const rows = await prisma.allocation.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    const list: AllocationListRow[] = await Promise.all(
+      rows.map(async (r) => {
+        const product = await getProductById(r.productId);
+        return {
+          ...toAllocationPayload(r),
+          productName: product?.name ?? r.productId
+        };
+      })
+    );
+    res.json(list);
+  });
+
+  // DELETE /api/allocations/:id - delete an allocation (does not remove in-memory entitlements)
+  router.delete("/allocations/:id", async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const deleted = await prisma.allocation.deleteMany({ where: { id } });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: "Allocation not found" });
+    }
+    res.status(204).send();
+  });
+
   // GET /api/products/:productId/allocations - list allocations for a product
   router.get("/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
@@ -91,7 +120,7 @@ export function registerAllocationRoutes(router: IRouter) {
             : "No clubs defined. Create clubs in admin first."
         });
       }
-      memberIds = getMembersByClub(code);
+      memberIds = await getMembersByClub(code);
       if (memberIds.length === 0) {
         return res.status(400).json({ error: "No members found for that club" });
       }
@@ -103,7 +132,7 @@ export function registerAllocationRoutes(router: IRouter) {
       if (ids.length === 0) {
         return res.status(400).json({ error: "memberIds must contain at least one string id" });
       }
-      if (!getMemberIdsExist(ids)) {
+      if (!(await getMemberIdsExist(ids))) {
         return res.status(400).json({ error: "One or more memberIds are not valid members" });
       }
       memberIds = ids;

@@ -29,6 +29,7 @@ type ViewKey =
   | "products"
   | "memberships"
   | "pickups"
+  | "allocations"
   | "developerFees"
   | "settings"
   | "manageMemberships"
@@ -142,6 +143,10 @@ export const App: React.FC = () => {
   const [pickupsFilter, setPickupsFilter] = React.useState<"all" | "ready" | "picked">("all");
   const [pickupsSearch, setPickupsSearch] = React.useState("");
   const [pickupsTogglingId, setPickupsTogglingId] = React.useState<string | null>(null);
+  const [allocationsList, setAllocationsList] = React.useState<
+    { id: string; productId: string; productName: string; quantityPerPerson: number; targetType: string; clubCode?: string; memberIds: string[]; totalQuantity: number; createdAt: string }[]
+  >([]);
+  const [allocationsDeletingId, setAllocationsDeletingId] = React.useState<string | null>(null);
 
   // Membership workflow form
   const [membershipClub, setMembershipClub] = React.useState<ClubCode>("");
@@ -345,10 +350,25 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const loadAllocations = React.useCallback(async () => {
+    try {
+      const res = await apiRequest("/api/allocations");
+      if (res.ok) {
+        const data = await res.json();
+        setAllocationsList(Array.isArray(data) ? data : []);
+      } else {
+        setAllocationsList([]);
+      }
+    } catch {
+      setAllocationsList([]);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (view === "notifications") loadNotifications();
     if (view === "pickups") loadPickups();
-  }, [view, loadNotifications, loadPickups]);
+    if (view === "allocations") loadAllocations();
+  }, [view, loadNotifications, loadPickups, loadAllocations]);
 
   const loadFeeConfig = React.useCallback(async () => {
     try {
@@ -898,6 +918,21 @@ export const App: React.FC = () => {
             onClick={() => setView("pickups")}
           >
             Pickups
+          </button>
+          <button
+            style={{
+              textAlign: "left",
+              border: "none",
+              borderRadius: 999,
+              padding: "0.5rem 0.9rem",
+              background:
+                view === "allocations" ? "rgba(86, 119, 252, 0.18)" : "transparent",
+              color: view === "allocations" ? "#f5f5f7" : "#a3a3bf",
+              cursor: "pointer"
+            }}
+            onClick={() => setView("allocations")}
+          >
+            Allocations
           </button>
           <button
             style={{
@@ -1864,29 +1899,29 @@ export const App: React.FC = () => {
                   }}
                 >
                   <label style={{ display: "block" }}>
-                    <div style={{ marginBottom: 4 }}>Preorder opens</div>
+                    <div style={{ marginBottom: 4 }}>Preorder opens (12:00 AM)</div>
                     <input
-                      type="datetime-local"
-                      value={preorderStart}
-                      onChange={(e) => setPreorderStart(e.target.value)}
+                      type="date"
+                      value={preorderStart.includes("T") ? preorderStart.slice(0, 10) : preorderStart}
+                      onChange={(e) => setPreorderStart(e.target.value ? `${e.target.value}T00:00` : "")}
                       style={inputStyle}
                     />
                   </label>
                   <label style={{ display: "block" }}>
-                    <div style={{ marginBottom: 4 }}>Preorder closes</div>
+                    <div style={{ marginBottom: 4 }}>Preorder closes (12:00 AM)</div>
                     <input
-                      type="datetime-local"
-                      value={preorderEnd}
-                      onChange={(e) => setPreorderEnd(e.target.value)}
+                      type="date"
+                      value={preorderEnd.includes("T") ? preorderEnd.slice(0, 10) : preorderEnd}
+                      onChange={(e) => setPreorderEnd(e.target.value ? `${e.target.value}T00:00` : "")}
                       style={inputStyle}
                     />
                   </label>
                   <label style={{ display: "block" }}>
-                    <div style={{ marginBottom: 4 }}>Pickup starts</div>
+                    <div style={{ marginBottom: 4 }}>Pickup starts (12:00 AM)</div>
                     <input
-                      type="datetime-local"
-                      value={releaseAt}
-                      onChange={(e) => setReleaseAt(e.target.value)}
+                      type="date"
+                      value={releaseAt.includes("T") ? releaseAt.slice(0, 10) : releaseAt}
+                      onChange={(e) => setReleaseAt(e.target.value ? `${e.target.value}T00:00` : "")}
                       style={inputStyle}
                     />
                   </label>
@@ -3468,6 +3503,87 @@ export const App: React.FC = () => {
                 </p>
               ) : null;
             })()}
+          </section>
+        )}
+
+        {view === "allocations" && (
+          <section
+            style={{
+              padding: "1.25rem 1.35rem 1.5rem",
+              borderRadius: 18,
+              backgroundColor: "#11111a",
+              border: "1px solid #262637",
+              marginBottom: 20,
+              overflowX: "auto"
+            }}
+          >
+            <h2 style={{ fontSize: 16, margin: 0, marginBottom: 4 }}>Manage allocations</h2>
+            <p style={{ fontSize: 12, color: "#8a8cab", marginTop: 0, marginBottom: 16 }}>
+              Allocations grant club members (or specific members) a quantity of a product. Create new ones from Products → Allocate. Delete below to remove an allocation (pickup entitlements in memory are not removed until backend restart).
+            </p>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #262637" }}>
+                  <th style={{ textAlign: "left", padding: "8px 10px" }}>Product</th>
+                  <th style={{ textAlign: "left", padding: "8px 10px" }}>Target</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px" }}>Qty/person</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px" }}>Total</th>
+                  <th style={{ textAlign: "left", padding: "8px 10px" }}>Created</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {allocationsList.map((a) => (
+                  <tr key={a.id} style={{ borderBottom: "1px solid #1e1e2a" }}>
+                    <td style={{ padding: "8px 10px" }}>{a.productName}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      {a.targetType === "club" ? `Club: ${a.clubCode ?? ""}` : `${a.memberIds.length} member(s)`}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right" }}>{a.quantityPerPerson}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right" }}>{a.totalQuantity}</td>
+                    <td style={{ padding: "8px 10px", color: "#8a8cab" }}>
+                      {new Date(a.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                      <button
+                        type="button"
+                        disabled={allocationsDeletingId === a.id}
+                        style={{
+                          padding: "0.3rem 0.6rem",
+                          fontSize: 12,
+                          border: "1px solid #6a2a2a",
+                          background: "#2a1515",
+                          color: "#e88",
+                          borderRadius: 6,
+                          cursor: allocationsDeletingId === a.id ? "not-allowed" : "pointer"
+                        }}
+                        onClick={async () => {
+                          if (!confirm(`Delete this allocation for ${a.productName}?`)) return;
+                          setAllocationsDeletingId(a.id);
+                          try {
+                            const res = await apiRequest(`/api/allocations/${a.id}`, { method: "DELETE" });
+                            if (res.ok) loadAllocations();
+                            else {
+                              const err = await res.json().catch(() => ({}));
+                              alert(err?.error ?? "Failed to delete.");
+                            }
+                          } finally {
+                            setAllocationsDeletingId(null);
+                          }
+                        }}
+                      >
+                        {allocationsDeletingId === a.id ? "…" : "Delete"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {allocationsList.length === 0 && (
+              <p style={{ fontSize: 13, color: "#6a6a8a", marginTop: 16, marginBottom: 0 }}>
+                No allocations yet. Go to Products and use “Allocate” on a product to create one.
+              </p>
+            )}
           </section>
         )}
 

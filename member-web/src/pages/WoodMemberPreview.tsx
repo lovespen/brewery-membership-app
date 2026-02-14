@@ -69,6 +69,14 @@ function formatUSD(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/** Format ISO date/datetime string as date only (e.g. "Mar 1, 2026") for display. */
+function formatDateOnly(iso: string): string {
+  if (!iso || !iso.trim()) return "";
+  const d = new Date(iso.trim());
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(base64.replace(/-/g, "+").replace(/_/g, "/") + padding);
@@ -606,9 +614,9 @@ export const MemberPreview: React.FC = () => {
           preorderWindow:
             p.isPreorder && (p.preorderStartAt || p.preorderEndAt || p.releaseAt)
               ? {
-                  start: p.preorderStartAt || "",
-                  end: p.preorderEndAt || "",
-                  release: p.releaseAt || ""
+                  start: formatDateOnly(p.preorderStartAt || ""),
+                  end: formatDateOnly(p.preorderEndAt || ""),
+                  release: formatDateOnly(p.releaseAt || "")
                 }
               : undefined
         }));
@@ -772,7 +780,7 @@ export const MemberPreview: React.FC = () => {
         name: products.find((p) => p.id === e.productId)?.name ?? "Product",
         quantity: e.quantity,
         status: "PAID – NOT READY",
-        release: e.releaseAt || "TBD"
+        release: formatDateOnly(e.releaseAt || "") || "TBD"
       })),
     [entitlementsRaw.upcomingPreorders, products]
   );

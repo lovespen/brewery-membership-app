@@ -1,44 +1,77 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
 import type { ClubCode } from "./products";
-import { getClubCodes } from "./clubs";
+import { getClubCodes, getClubByCode } from "./clubs";
 import { getEntitlementsByMemberId, getEntitlementById, markEntitlementPickedUp, promotePreordersToReady } from "../stores/entitlements";
+import { prisma } from "../db";
 
-type InMemoryMember = {
+export type MemberPayload = {
   id: string;
-  name?: string;
-  email?: string;
+  name: string | null;
+  email: string | null;
   clubCode: ClubCode;
 };
 
-const members: InMemoryMember[] = [
-  { id: "m1", name: "Alex Smith", email: "alex@example.com", clubCode: "SAP" },
-  { id: "m2", name: "Briana Lee", email: "briana@example.com", clubCode: "WOOD" },
-  { id: "m3", name: "Chris Doe", email: "chris@example.com", clubCode: "CELLARS" }
-];
-
-export function getMemberById(id: string): InMemoryMember | undefined {
-  return members.find((m) => m.id === id);
+/** Get member by user id; returns first active membership's club for clubCode. */
+export async function getMemberById(id: string): Promise<MemberPayload | undefined> {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      memberships: {
+        where: { status: "ACTIVE" },
+        take: 1,
+        include: { club: { select: { code: true } } }
+      }
+    }
+  });
+  if (!user) return undefined;
+  const clubCode = (user.memberships[0]?.club?.code ?? "") as ClubCode;
+  return {
+    id: user.id,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    clubCode
+  };
 }
 
-export function getMembersByClub(clubCode: ClubCode): string[] {
-  return members.filter((m) => m.clubCode === clubCode).map((m) => m.id);
+/** Get user IDs that have an active membership for the given club. */
+export async function getMembersByClub(clubCode: ClubCode): Promise<string[]> {
+  const club = await getClubByCode(clubCode);
+  if (!club) return [];
+  const memberships = await prisma.membership.findMany({
+    where: { clubId: club.id, status: "ACTIVE" },
+    select: { userId: true }
+  });
+  return memberships.map((m) => m.userId);
 }
 
-export function getMemberIdsExist(ids: string[]): boolean {
-  const set = new Set(members.map((m) => m.id));
+/** Return true if every id exists as a User. */
+export async function getMemberIdsExist(ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return false;
+  const found = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true }
+  });
+  const set = new Set(found.map((u) => u.id));
   return ids.every((id) => set.has(id));
 }
 
 export function registerMemberRoutes(router: IRouter) {
-  // GET /api/members - list members (optional ?clubCode= for filter)
+  // GET /api/members - list members (optional ?clubCode= for filter). One row per active membership.
   router.get("/members", async (req: Request, res: Response) => {
     const validCodes = await getClubCodes();
     const clubCode = (req.query.clubCode as string | undefined)?.trim().toUpperCase() as ClubCode | undefined;
-    let list = [...members];
-    if (clubCode && validCodes.includes(clubCode)) {
-      list = list.filter((m) => m.clubCode === clubCode);
-    }
+    const clubFilter = clubCode && validCodes.includes(clubCode) ? (await getClubByCode(clubCode))?.id : undefined;
+    const memberships = await prisma.membership.findMany({
+      where: { status: "ACTIVE", ...(clubFilter ? { clubId: clubFilter } : {}) },
+      include: { user: { select: { id: true, name: true, email: true } }, club: { select: { code: true } } }
+    });
+    const list: MemberPayload[] = memberships.map((m) => ({
+      id: m.user.id,
+      name: m.user.name ?? null,
+      email: m.user.email ?? null,
+      clubCode: m.club.code as ClubCode
+    }));
     res.json(list);
   });
 
@@ -75,4 +108,3 @@ export function registerMemberRoutes(router: IRouter) {
     }
   );
 }
-
