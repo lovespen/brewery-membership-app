@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./index.css";
 import { AdminAuthProvider, useAdminAuth } from "./AdminAuthContext";
 import { LoginPage } from "./LoginPage";
 import { App } from "./pages/App";

@@ -19,7 +19,8 @@ function preorderDateToMidnight(s: string): string {
 
 type ClubPrice = {
   clubCode: ClubCode;
-  priceCents: number | "";
+  /** Display string for override (e.g. "12.50" or ""). Kept as string so typing "12." is not lost. */
+  priceInput: string;
 };
 
 type ViewKey =
@@ -287,12 +288,12 @@ export const App: React.FC = () => {
       setClubPrices((prev) => {
         const clubs = clubsFromApi ?? [];
         if (prev.length === 0) {
-          return clubs.map((c) => ({ clubCode: c.code, priceCents: "" as const }));
+          return clubs.map((c) => ({ clubCode: c.code, priceInput: "" }));
         }
         const existingCodes = new Set(prev.map((cp) => cp.clubCode));
         const missing = clubs.filter((c) => !existingCodes.has(c.code));
         if (missing.length === 0) return prev;
-        return [...prev, ...missing.map((c) => ({ clubCode: c.code, priceCents: "" as const }))];
+        return [...prev, ...missing.map((c) => ({ clubCode: c.code, priceInput: "" }))];
       });
     }
   }, [clubsFromApi]);
@@ -548,19 +549,14 @@ export const App: React.FC = () => {
   };
 
   const updateClubPrice = (code: ClubCode, value: string) => {
-    const trimmed = value.trim();
-    const parsed: number | "" =
-      trimmed === "" ? "" : Math.round(parseFloat(trimmed) * 100);
-    const parsedCents: number | "" =
-      trimmed !== "" && !Number.isNaN(parsed) && parsed >= 0 ? parsed : "";
     setClubPrices((prev) => {
       const idx = prev.findIndex((cp) => cp.clubCode === code);
       if (idx >= 0) {
         return prev.map((cp, i) =>
-          i === idx ? { ...cp, priceCents: trimmed === "" ? "" : parsedCents } : cp
+          i === idx ? { ...cp, priceInput: value } : cp
         );
       }
-      return [...prev, { clubCode: code, priceCents: trimmed === "" ? "" : parsedCents }];
+      return [...prev, { clubCode: code, priceInput: value }];
     });
   };
 
@@ -570,7 +566,7 @@ export const App: React.FC = () => {
     setDescription("");
     setBasePriceCents("");
     setAllowedClubs([]);
-    setClubPrices((clubsFromApi ?? []).map((c) => ({ clubCode: c.code, priceCents: "" as const })));
+    setClubPrices((clubsFromApi ?? []).map((c) => ({ clubCode: c.code, priceInput: "" })));
     setIsPreorder(false);
     setPreorderStart("");
     setPreorderEnd("");
@@ -605,7 +601,7 @@ export const App: React.FC = () => {
           const entry = (p.clubPrices ?? []).find((cp) => cp.clubCode === c.code);
           return {
             clubCode: c.code,
-            priceCents: entry ? entry.priceCents : ""
+            priceInput: entry ? (entry.priceCents / 100).toFixed(2) : ""
           };
         })
       );
@@ -630,7 +626,12 @@ export const App: React.FC = () => {
       basePriceCents: baseCents,
       currency: "USD",
       allowedClubIds: allowedClubs,
-      clubPrices: clubPrices.filter((cp) => cp.priceCents !== "").map((cp) => ({ clubCode: cp.clubCode, priceCents: typeof cp.priceCents === "number" ? cp.priceCents : 0 })),
+      clubPrices: clubPrices
+        .filter((cp) => cp.priceInput.trim() !== "")
+        .map((cp) => {
+          const cents = Math.round(parseFloat(cp.priceInput.trim()) * 100);
+          return { clubCode: cp.clubCode, priceCents: Number.isNaN(cents) || cents < 0 ? 0 : cents };
+        }),
       isPreorder,
       preorderStartAt: isPreorder && preorderStart ? preorderDateToMidnight(preorderStart) : null,
       preorderEndAt: isPreorder && preorderEnd ? preorderDateToMidnight(preorderEnd) : null,
@@ -1703,6 +1704,7 @@ export const App: React.FC = () => {
                   type="number"
                   min="0"
                   step="0.01"
+                  className="no-spinner"
                   value={
                     typeof basePriceCents === "number"
                       ? (basePriceCents / 100).toString()
@@ -1822,13 +1824,7 @@ export const App: React.FC = () => {
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={
-                            entry && typeof entry.priceCents === "number"
-                              ? (entry.priceCents / 100) % 1 === 0
-                                ? (entry.priceCents / 100).toString()
-                                : (entry.priceCents / 100).toFixed(2)
-                              : ""
-                          }
+                          value={entry?.priceInput ?? ""}
                           onChange={(e) =>
                             updateClubPrice(club.code, e.target.value)
                           }
