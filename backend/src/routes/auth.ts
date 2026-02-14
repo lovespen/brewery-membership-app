@@ -80,6 +80,8 @@ export function isPublicApiRoute(method: string, path: string): boolean {
   if (method === "POST" && path === "/checkout/create-payment-intent") return true;
   if (method === "GET" && path === "/push/vapid-public-key") return true;
   if (method === "POST" && path === "/push-subscriptions") return true;
+  if (method === "GET" && /^\/pickups\/by-member\/[^/]+$/.test(path)) return true;
+  if (method === "PATCH" && /^\/pickups\/[^/]+$/.test(path)) return true;
   return false;
 }
 
