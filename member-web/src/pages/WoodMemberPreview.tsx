@@ -16,12 +16,14 @@ function getApiBase(): string {
 const API = getApiBase();
 const AUTH_TOKEN_KEY = "memberAuthToken";
 
-/** Base URL for staff pickup page. Use env VITE_STAFF_PICKUP_URL, or same host as this page on port 4000 so phone can reach backend when on same Wi‑Fi. */
+/** Base URL for staff pickup page (backend). QR code must point at the backend so /staff-pickup and /api/pickups work. */
 function getStaffPickupBase(): string {
   const env = typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_STAFF_PICKUP_URL;
-  if (env) return env;
-  if (typeof window !== "undefined" && window.location?.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    return `http://${window.location.hostname}:4000`;
+  if (env && String(env).trim()) return String(env).trim().replace(/\/$/, "");
+  const apiBase = getApiBase();
+  if (apiBase) return apiBase;
+  if (typeof window !== "undefined" && window.location?.hostname && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    return "http://localhost:4000";
   }
   return "http://localhost:4000";
 }
@@ -732,8 +734,8 @@ export const MemberPreview: React.FC = () => {
     member.clubs.length > 0 && p.allowedClubs.some((c) => member.clubs.includes(c))
   );
 
-  // Entitlements from API (allocations + preorders) – no stubbed pickup data
-  type RawEntitlement = { id: string; productId: string; quantity: number; releaseAt?: string | null };
+  // Entitlements from API (allocations + preorders) – productName included so preorder→ready still shows name
+  type RawEntitlement = { id: string; productId: string; quantity: number; productName?: string; releaseAt?: string | null };
   const [entitlementsRaw, setEntitlementsRaw] = React.useState<{
     readyForPickup: RawEntitlement[];
     upcomingPreorders: RawEntitlement[];
@@ -768,7 +770,7 @@ export const MemberPreview: React.FC = () => {
     () =>
       entitlementsRaw.readyForPickup.map((e) => ({
         id: e.id,
-        name: products.find((p) => p.id === e.productId)?.name ?? "Product",
+        name: e.productName ?? products.find((p) => p.id === e.productId)?.name ?? "Product",
         quantity: e.quantity,
         status: "READY"
       })),
@@ -778,7 +780,7 @@ export const MemberPreview: React.FC = () => {
     () =>
       entitlementsRaw.upcomingPreorders.map((e) => ({
         id: e.id,
-        name: products.find((p) => p.id === e.productId)?.name ?? "Product",
+        name: e.productName ?? products.find((p) => p.id === e.productId)?.name ?? "Product",
         quantity: e.quantity,
         status: "PAID – NOT READY",
         release: formatDateOnly(e.releaseAt || "") || "TBD"

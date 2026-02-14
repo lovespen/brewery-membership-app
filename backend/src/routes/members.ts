@@ -1,7 +1,7 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
 import type { ClubCode } from "./products";
-import { getClubCodes, getClubByCode } from "./clubs";
+import { getClubCodes, getClubByCode, getProductById } from "./products";
 import { getEntitlementsByMemberId, getEntitlementById, markEntitlementPickedUp, promotePreordersToReady } from "../stores/entitlements";
 import { prisma } from "../db";
 
@@ -75,15 +75,21 @@ export function registerMemberRoutes(router: IRouter) {
     res.json(list);
   });
 
-  // GET /api/members/:id/entitlements - pickup + preorder entitlements for member
+  // GET /api/members/:id/entitlements - pickup + preorder entitlements for member (includes productName for display)
   router.get(
     "/members/:id/entitlements",
     async (req: Request, res: Response) => {
       await promotePreordersToReady();
       const { id } = req.params;
       const all = await getEntitlementsByMemberId(id);
-      const readyForPickup = all.filter((e) => e.status === "READY_FOR_PICKUP");
-      const upcomingPreorders = all.filter((e) => e.status === "NOT_READY");
+      const withNames = await Promise.all(
+        all.map(async (e) => {
+          const product = await getProductById(e.productId);
+          return { ...e, productName: product?.name ?? e.productId };
+        })
+      );
+      const readyForPickup = withNames.filter((e) => e.status === "READY_FOR_PICKUP");
+      const upcomingPreorders = withNames.filter((e) => e.status === "NOT_READY");
       res.json({
         memberId: id,
         readyForPickup,
