@@ -36,8 +36,8 @@ async function resolveDisplayName(userId: string): Promise<{ name: string | null
 export function registerPickupRoutes(router: IRouter, app: Express) {
   // GET /api/pickups - list entitlements ready for pickup or already picked up (for admin)
   router.get("/pickups", async (_req: Request, res: Response) => {
-    promotePreordersToReady();
-    const all = getAllEntitlements();
+    await promotePreordersToReady();
+    const all = await getAllEntitlements();
     const relevant = all.filter(
       (e) => e.status === "READY_FOR_PICKUP" || e.status === "PICKED_UP"
     );
@@ -65,7 +65,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
 
   // GET /api/pickups/by-member/:memberId - pickups for one member (for staff scan page)
   router.get("/pickups/by-member/:memberId", async (req: Request, res: Response) => {
-    promotePreordersToReady();
+    await promotePreordersToReady();
     const { memberId } = req.params;
     const memberFromList = await getMemberById(memberId);
     const memberRecord = memberFromList ?? await getUserById(memberId);
@@ -74,7 +74,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
       return;
     }
     const member = { id: memberRecord.id, name: memberRecord.name ?? null, email: memberRecord.email ?? null };
-    const all = getAllEntitlements();
+    const all = await getAllEntitlements();
     const forMember = all.filter(
       (e) => e.userId === memberId && (e.status === "READY_FOR_PICKUP" || e.status === "PICKED_UP")
     );
@@ -98,10 +98,10 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
   });
 
   // PATCH /api/pickups/:id - mark as picked up or not (body: { pickedUp: boolean })
-  router.patch("/pickups/:id", (req: Request, res: Response) => {
+  router.patch("/pickups/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { pickedUp } = req.body as { pickedUp?: boolean };
-    const ent = getEntitlementById(id);
+    const ent = await getEntitlementById(id);
     if (!ent) {
       res.status(404).json({ error: "Entitlement not found" });
       return;
@@ -111,7 +111,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
       return;
     }
     if (pickedUp === true) {
-      if (markEntitlementPickedUp(id)) {
+      if (await markEntitlementPickedUp(id)) {
         res.json({ id, pickedUp: true });
       } else {
         res.status(400).json({ error: "Already picked up or not ready" });
@@ -119,7 +119,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
       return;
     }
     if (pickedUp === false) {
-      if (markEntitlementNotPickedUp(id)) {
+      if (await markEntitlementNotPickedUp(id)) {
         res.json({ id, pickedUp: false });
       } else {
         res.status(400).json({ error: "Not in picked-up state" });

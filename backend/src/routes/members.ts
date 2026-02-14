@@ -79,9 +79,9 @@ export function registerMemberRoutes(router: IRouter) {
   router.get(
     "/members/:id/entitlements",
     async (req: Request, res: Response) => {
-      promotePreordersToReady();
+      await promotePreordersToReady();
       const { id } = req.params;
-      const all = getEntitlementsByMemberId(id);
+      const all = await getEntitlementsByMemberId(id);
       const readyForPickup = all.filter((e) => e.status === "READY_FOR_PICKUP");
       const upcomingPreorders = all.filter((e) => e.status === "NOT_READY");
       res.json({
@@ -101,8 +101,8 @@ export function registerMemberRoutes(router: IRouter) {
       const ids = Array.isArray(entitlementIds) ? entitlementIds : [];
       const fulfilled: string[] = [];
       for (const entId of ids) {
-        const ent = getEntitlementById(entId);
-        if (ent && ent.userId === id && markEntitlementPickedUp(entId)) fulfilled.push(entId);
+        const ent = await getEntitlementById(entId);
+        if (ent && ent.userId === id && (await markEntitlementPickedUp(entId))) fulfilled.push(entId);
       }
       res.json({ memberId: id, fulfilledEntitlementIds: fulfilled });
     }

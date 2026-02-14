@@ -178,13 +178,13 @@ export function registerAllocationRoutes(router: IRouter) {
           : (releaseAtRaw as Date).toISOString()
         : null;
 
-    addEntitlements(
+    await addEntitlements(
       memberIds.map((userId) => ({
         userId,
         productId,
         quantity: qty,
         status,
-        source: "ALLOCATION" as const,
+        source: "ALLOCATION",
         releaseAt,
         pickedUpAt: null
       }))

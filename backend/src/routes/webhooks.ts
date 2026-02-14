@@ -80,7 +80,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
             }
           }
           if (entries.length > 0) {
-            addEntitlements(entries);
+            await addEntitlements(entries);
             for (const e of entries) {
               await incrementOrderedNotPickedUp(e.productId, e.quantity);
             }

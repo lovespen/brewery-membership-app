@@ -1,59 +1,101 @@
-/** In-memory pickup entitlements (allocations, preorders, orders). Shared so members + allocations can read/write. */
-export type InMemoryPickupEntitlement = {
+/** Persisted pickup entitlements (allocations, preorders, orders). Stored in DB so they survive restarts. */
+import { prisma } from "../db";
+
+export type EntitlementPayload = {
   id: string;
   userId: string;
   productId: string;
   quantity: number;
   status: "NOT_READY" | "READY_FOR_PICKUP" | "PICKED_UP" | "EXPIRED";
-  source: "ALLOCATION" | "PREORDER" | "ORDER";
+  source: string;
   releaseAt: string | null;
   pickedUpAt: string | null;
 };
 
-const entitlements: InMemoryPickupEntitlement[] = [];
-
-export function getEntitlementsByMemberId(memberId: string): InMemoryPickupEntitlement[] {
-  return entitlements.filter((e) => e.userId === memberId);
+function rowToPayload(row: {
+  id: string;
+  userId: string;
+  productId: string;
+  quantity: number;
+  status: string;
+  source: string;
+  releaseAt: Date | null;
+  pickedUpAt: Date | null;
+}): EntitlementPayload {
+  return {
+    id: row.id,
+    userId: row.userId,
+    productId: row.productId,
+    quantity: row.quantity,
+    status: row.status as EntitlementPayload["status"],
+    source: row.source,
+    releaseAt: row.releaseAt?.toISOString() ?? null,
+    pickedUpAt: row.pickedUpAt?.toISOString() ?? null
+  };
 }
 
-export function getAllEntitlements(): InMemoryPickupEntitlement[] {
-  return [...entitlements];
+export async function getEntitlementsByMemberId(memberId: string): Promise<EntitlementPayload[]> {
+  const rows = await prisma.pickupEntitlement.findMany({
+    where: { userId: memberId }
+  });
+  return rows.map(rowToPayload);
 }
 
-export function getEntitlementById(id: string): InMemoryPickupEntitlement | undefined {
-  return entitlements.find((e) => e.id === id);
+export async function getAllEntitlements(): Promise<EntitlementPayload[]> {
+  const rows = await prisma.pickupEntitlement.findMany();
+  return rows.map(rowToPayload);
 }
 
-export function markEntitlementPickedUp(id: string): boolean {
-  const e = entitlements.find((x) => x.id === id);
-  if (!e || e.status !== "READY_FOR_PICKUP") return false;
-  e.status = "PICKED_UP";
-  e.pickedUpAt = new Date().toISOString();
+export async function getEntitlementById(id: string): Promise<EntitlementPayload | undefined> {
+  const row = await prisma.pickupEntitlement.findUnique({ where: { id } });
+  if (!row) return undefined;
+  return rowToPayload(row);
+}
+
+export async function markEntitlementPickedUp(id: string): Promise<boolean> {
+  const row = await prisma.pickupEntitlement.findUnique({ where: { id } });
+  if (!row || row.status !== "READY_FOR_PICKUP") return false;
+  await prisma.pickupEntitlement.update({
+    where: { id },
+    data: { status: "PICKED_UP", pickedUpAt: new Date() }
+  });
   return true;
 }
 
-export function markEntitlementNotPickedUp(id: string): boolean {
-  const e = entitlements.find((x) => x.id === id);
-  if (!e || e.status !== "PICKED_UP") return false;
-  e.status = "READY_FOR_PICKUP";
-  e.pickedUpAt = null;
+export async function markEntitlementNotPickedUp(id: string): Promise<boolean> {
+  const row = await prisma.pickupEntitlement.findUnique({ where: { id } });
+  if (!row || row.status !== "PICKED_UP") return false;
+  await prisma.pickupEntitlement.update({
+    where: { id },
+    data: { status: "READY_FOR_PICKUP", pickedUpAt: null }
+  });
   return true;
 }
 
-export function addEntitlements(entries: Omit<InMemoryPickupEntitlement, "id">[]): void {
-  for (const e of entries) {
-    const id = `ent_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-    entitlements.push({ ...e, id });
-  }
+export async function addEntitlements(entries: Omit<EntitlementPayload, "id">[]): Promise<void> {
+  if (entries.length === 0) return;
+  const now = new Date();
+  await prisma.pickupEntitlement.createMany({
+    data: entries.map((e) => ({
+      userId: e.userId,
+      productId: e.productId,
+      quantity: e.quantity,
+      status: e.status,
+      source: e.source,
+      releaseAt: e.releaseAt ? new Date(e.releaseAt) : null,
+      pickedUpAt: null
+    }))
+  });
 }
 
-/** Promote NOT_READY entitlements (PREORDER or ALLOCATION) to READY_FOR_PICKUP when releaseAt has passed. */
-export function promotePreordersToReady(): void {
-  const now = new Date().toISOString();
-  for (const e of entitlements) {
-    if (e.status !== "NOT_READY" || !e.releaseAt) continue;
-    if (e.releaseAt <= now) {
-      e.status = "READY_FOR_PICKUP";
-    }
-  }
+/** Promote NOT_READY entitlements to READY_FOR_PICKUP when releaseAt has passed. */
+export async function promotePreordersToReady(): Promise<void> {
+  const now = new Date();
+  await prisma.pickupEntitlement.updateMany({
+    where: {
+      status: "NOT_READY",
+      releaseAt: { lte: now }
+    },
+    data: { status: "READY_FOR_PICKUP" }
+  });
 }
