@@ -287,12 +287,12 @@ export const App: React.FC = () => {
       setClubPrices((prev) => {
         const clubs = clubsFromApi ?? [];
         if (prev.length === 0) {
-          return clubs.map((c) => ({ clubCode: c.code, priceCents: "" as number | "" }));
+          return clubs.map((c) => ({ clubCode: c.code, priceCents: "" as const }));
         }
         const existingCodes = new Set(prev.map((cp) => cp.clubCode));
         const missing = clubs.filter((c) => !existingCodes.has(c.code));
         if (missing.length === 0) return prev;
-        return [...prev, ...missing.map((c) => ({ clubCode: c.code, priceCents: "" as number | "" }))];
+        return [...prev, ...missing.map((c) => ({ clubCode: c.code, priceCents: "" as const }))];
       });
     }
   }, [clubsFromApi]);
@@ -549,13 +549,10 @@ export const App: React.FC = () => {
 
   const updateClubPrice = (code: ClubCode, value: string) => {
     const trimmed = value.trim();
-    const parsed =
-      trimmed === ""
-        ? (""
-          as number | "")
-        : Math.round(parseFloat(trimmed) * 100);
-    const parsedCents =
-      trimmed !== "" && !Number.isNaN(parsed) && parsed >= 0 ? parsed : ("" as number | "");
+    const parsed: number | "" =
+      trimmed === "" ? "" : Math.round(parseFloat(trimmed) * 100);
+    const parsedCents: number | "" =
+      trimmed !== "" && !Number.isNaN(parsed) && parsed >= 0 ? parsed : "";
     setClubPrices((prev) => {
       const idx = prev.findIndex((cp) => cp.clubCode === code);
       if (idx >= 0) {
@@ -573,7 +570,7 @@ export const App: React.FC = () => {
     setDescription("");
     setBasePriceCents("");
     setAllowedClubs([]);
-    setClubPrices((clubsFromApi ?? []).map((c) => ({ clubCode: c.code, priceCents: "" as number | "" })));
+    setClubPrices((clubsFromApi ?? []).map((c) => ({ clubCode: c.code, priceCents: "" as const })));
     setIsPreorder(false);
     setPreorderStart("");
     setPreorderEnd("");
