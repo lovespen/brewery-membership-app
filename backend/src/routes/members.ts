@@ -1,7 +1,8 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
 import type { ClubCode } from "./products";
-import { getClubCodes, getClubByCode, getProductById } from "./products";
+import { getProductById } from "./products";
+import { getClubCodes, getClubByCode } from "./clubs";
 import { getEntitlementsByMemberId, getEntitlementById, markEntitlementPickedUp, promotePreordersToReady } from "../stores/entitlements";
 import { prisma } from "../db";
 
