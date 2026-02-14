@@ -386,15 +386,19 @@ export const MemberPreview: React.FC = () => {
     return () => controller.abort();
   }, [authToken]);
 
-  // Generate QR code for staff pickup (member ID in URL; staff scan to see and mark pickups)
+  // Generate QR code for staff pickup. URL points to THIS app at /staff-pickup so when staff scan they open the member app and get the staff pickup page (which fetches from API).
   React.useEffect(() => {
     setShowPickupQr(false);
     if (!effectiveMemberId) {
       setPickupQrDataUrl(null);
       return;
     }
-    const base = getStaffPickupBase();
-    const url = `${base}/staff-pickup?memberId=${encodeURIComponent(effectiveMemberId)}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = origin ? `${origin}/staff-pickup?memberId=${encodeURIComponent(effectiveMemberId)}` : "";
+    if (!url) {
+      setPickupQrDataUrl(null);
+      return;
+    }
     QRCode.toDataURL(url, { width: 256, margin: 2 })
       .then(setPickupQrDataUrl)
       .catch(() => setPickupQrDataUrl(null));

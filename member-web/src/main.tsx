@@ -2,17 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./member-mobile.css";
 import { MemberPreview } from "./pages/WoodMemberPreview";
+import { StaffPickupPage } from "./pages/StaffPickupPage";
 
-function shouldRedirectToStaffPickup(): boolean {
+function isStaffPickupPath(): boolean {
   if (typeof window === "undefined") return false;
-  const pathname = window.location.pathname;
-  if (pathname !== "/staff-pickup" && pathname !== "/staff-pickup/") return false;
-  const env = typeof import.meta !== "undefined" && (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
-  const base = env && String(env).trim() ? String(env).trim().replace(/\/$/, "") : "";
-  if (!base) return false;
-  const url = (/^https?:\/\//i.test(base) ? base : "https://" + base) + "/staff-pickup" + window.location.search;
-  window.location.replace(url);
-  return true;
+  const p = window.location.pathname;
+  return p === "/staff-pickup" || p === "/staff-pickup/";
 }
 
 class ErrorBoundary extends React.Component<
@@ -51,8 +46,15 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-if (!shouldRedirectToStaffPickup()) {
-  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+const root = document.getElementById("root") as HTMLElement;
+if (isStaffPickupPath()) {
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <StaffPickupPage />
+    </React.StrictMode>
+  );
+} else {
+  ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <ErrorBoundary>
         <MemberPreview />
