@@ -667,7 +667,14 @@ export const App: React.FC = () => {
         const text = await res.text();
         // eslint-disable-next-line no-console
         console.error("Failed to save product", text);
-        alert("Saving product failed – check backend console for details.");
+        const err = (() => {
+          try {
+            return JSON.parse(text);
+          } catch {
+            return {};
+          }
+        })();
+        alert(err?.error ? `Saving product failed: ${err.error}` : "Saving product failed – check backend console for details.");
         return;
       }
       // eslint-disable-next-line no-console

@@ -174,107 +174,111 @@ export function registerProductRoutes(router: IRouter) {
   });
 
   router.post("/products", async (req: Request, res: Response) => {
-    const {
-      name,
-      description,
-      basePriceCents,
-      currency = "USD",
-      allowedClubIds,
-      clubPrices,
-      isPreorder,
-      preorderStartAt,
-      preorderEndAt,
-      releaseAt,
-      taxRateId,
-      inventoryQuantity: initialInventory
-    } = req.body;
+    try {
+      const {
+        name,
+        description,
+        basePriceCents,
+        currency = "USD",
+        allowedClubIds,
+        clubPrices,
+        isPreorder,
+        preorderStartAt,
+        preorderEndAt,
+        releaseAt,
+        taxRateId,
+        inventoryQuantity: initialInventory
+      } = req.body;
 
-    if (!name || typeof basePriceCents !== "number") {
-      return res.status(400).json({
-        error: "name and basePriceCents are required"
-      });
-    }
-
-    const allowedClubCodes: ClubCode[] = Array.isArray(allowedClubIds)
-      ? (allowedClubIds as string[])
-          .map((c: string) => (c || "").toUpperCase())
-          .filter((c: string) =>
-            ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(c)
-          )
-      : [];
-
-    const normalizedClubPrices: { clubCode: ClubCode; priceCents: number }[] =
-      Array.isArray(clubPrices)
-        ? clubPrices
-            .filter(
-              (cp: { clubCode?: string; priceCents?: number }) =>
-                cp &&
-                typeof cp.clubCode === "string" &&
-                typeof cp.priceCents === "number"
-            )
-            .map((cp: { clubCode: string; priceCents: number }) => ({
-              clubCode: cp.clubCode.toUpperCase() as ClubCode,
-              priceCents: cp.priceCents
-            }))
-            .filter((cp) =>
-              ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(cp.clubCode)
-            )
-        : [];
-
-    const clubIds: string[] = [];
-    for (const code of allowedClubCodes) {
-      const club = await getClubByCode(code);
-      if (club) clubIds.push(club.id);
-    }
-
-    const priceCreates: { clubId: string; priceCents: number; currency: string }[] = [];
-    for (const cp of normalizedClubPrices) {
-      const club = await getClubByCode(cp.clubCode);
-      if (club) {
-        priceCreates.push({
-          clubId: club.id,
-          priceCents: cp.priceCents,
-          currency: currency || "USD"
+      if (!name || typeof basePriceCents !== "number") {
+        return res.status(400).json({
+          error: "name and basePriceCents are required"
         });
       }
-    }
 
-    const product = await prisma.product.create({
-      data: {
-        name: String(name).trim(),
-        description:
-          typeof description === "string" ? description.trim() || null : null,
-        basePriceCents:
-          typeof basePriceCents === "number" && basePriceCents >= 0
-            ? basePriceCents
-            : 0,
-        currency: currency || "USD",
-        isPreorder: !!isPreorder,
-        preorderStartAt:
-          isPreorder && preorderStartAt
-            ? new Date(preorderStartAt)
-            : null,
-        preorderEndAt:
-          isPreorder && preorderEndAt ? new Date(preorderEndAt) : null,
-        releaseAt: isPreorder && releaseAt ? new Date(releaseAt) : null,
-        taxRateId:
-          typeof taxRateId === "string" && taxRateId.trim()
-            ? taxRateId.trim()
-            : null,
-        inventoryQuantity:
-          typeof initialInventory === "number" && initialInventory >= 0
-            ? Math.floor(initialInventory)
-            : 0,
-        allowedClubs: {
-          create: clubIds.map((clubId) => ({ clubId }))
+      const validClubCodes = await getClubCodes();
+      const allowedClubCodes: ClubCode[] = Array.isArray(allowedClubIds)
+        ? (allowedClubIds as string[])
+            .map((c: string) => (c || "").toUpperCase())
+            .filter((c: string) => validClubCodes.includes(c))
+        : [];
+
+      const normalizedClubPrices: { clubCode: ClubCode; priceCents: number }[] =
+        Array.isArray(clubPrices)
+          ? clubPrices
+              .filter(
+                (cp: { clubCode?: string; priceCents?: number }) =>
+                  cp &&
+                  typeof cp.clubCode === "string" &&
+                  typeof cp.priceCents === "number"
+              )
+              .map((cp: { clubCode: string; priceCents: number }) => ({
+                clubCode: cp.clubCode.toUpperCase() as ClubCode,
+                priceCents: cp.priceCents
+              }))
+              .filter((cp) => validClubCodes.includes(cp.clubCode))
+          : [];
+
+      const clubIds: string[] = [];
+      for (const code of allowedClubCodes) {
+        const club = await getClubByCode(code);
+        if (club) clubIds.push(club.id);
+      }
+
+      const priceCreates: { clubId: string; priceCents: number; currency: string }[] = [];
+      for (const cp of normalizedClubPrices) {
+        const club = await getClubByCode(cp.clubCode);
+        if (club) {
+          priceCreates.push({
+            clubId: club.id,
+            priceCents: cp.priceCents,
+            currency: currency || "USD"
+          });
+        }
+      }
+
+      const product = await prisma.product.create({
+        data: {
+          name: String(name).trim(),
+          description:
+            typeof description === "string" ? description.trim() || null : null,
+          basePriceCents:
+            typeof basePriceCents === "number" && basePriceCents >= 0
+              ? basePriceCents
+              : 0,
+          currency: currency || "USD",
+          isPreorder: !!isPreorder,
+          preorderStartAt:
+            isPreorder && preorderStartAt
+              ? new Date(preorderStartAt)
+              : null,
+          preorderEndAt:
+            isPreorder && preorderEndAt ? new Date(preorderEndAt) : null,
+          releaseAt: isPreorder && releaseAt ? new Date(releaseAt) : null,
+          taxRateId:
+            typeof taxRateId === "string" && taxRateId.trim()
+              ? taxRateId.trim()
+              : null,
+          inventoryQuantity:
+            typeof initialInventory === "number" && initialInventory >= 0
+              ? Math.floor(initialInventory)
+              : 0,
+          allowedClubs: {
+            create: clubIds.map((clubId) => ({ clubId }))
+          },
+          prices: { create: priceCreates }
         },
-        prices: { create: priceCreates }
-      },
-      include: productInclude
-    });
+        include: productInclude
+      });
 
-    const payload = toProductPayload(product);
-    res.status(201).json(payload);
+      const payload = toProductPayload(product);
+      res.status(201).json(payload);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("POST /products error:", err);
+      res.status(500).json({ error: message });
+    }
   });
 
   router.get("/products/:id", async (req: Request, res: Response) => {
@@ -374,11 +378,10 @@ export function registerProductRoutes(router: IRouter) {
     await prisma.product.update({ where: { id }, data });
 
     if (Array.isArray(allowedClubIds)) {
+      const validClubCodes = await getClubCodes();
       const codes = (allowedClubIds as string[])
         .map((c) => (c || "").toUpperCase())
-        .filter((c) =>
-          ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(c)
-        );
+        .filter((c) => validClubCodes.includes(c));
       const clubIds: string[] = [];
       for (const code of codes) {
         const club = await getClubByCode(code);
@@ -391,6 +394,7 @@ export function registerProductRoutes(router: IRouter) {
     }
 
     if (Array.isArray(clubPrices)) {
+      const validClubCodes = await getClubCodes();
       const normalized = clubPrices
         .filter(
           (cp: { clubCode?: string; priceCents?: number }) =>
@@ -402,9 +406,7 @@ export function registerProductRoutes(router: IRouter) {
           clubCode: cp.clubCode.toUpperCase(),
           priceCents: cp.priceCents
         }))
-        .filter((cp) =>
-          ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(cp.clubCode)
-        );
+        .filter((cp) => validClubCodes.includes(cp.clubCode));
       await prisma.productPrice.deleteMany({ where: { productId: id } });
       for (const cp of normalized) {
         const club = await getClubByCode(cp.clubCode);
