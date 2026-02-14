@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN "basePriceCents" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Product" ADD COLUMN "orderedNotPickedUpCount" INTEGER NOT NULL DEFAULT 0;

@@ -2,7 +2,7 @@ import type { IRouter } from "express";
 import { Request, Response } from "express";
 import type { ClubCode } from "./products";
 import { getClubCodes } from "./clubs";
-import { getProductById, decrementProductInventory } from "./products";
+import { getProductById, decrementProductInventory, incrementOrderedNotPickedUp } from "./products";
 import { getMembersByClub, getMemberIdsExist } from "./members";
 import { addEntitlements } from "../stores/entitlements";
 import { prisma } from "../db";
@@ -35,16 +35,15 @@ function toAllocationPayload(row: { id: string; productId: string; quantityPerPe
   };
 }
 
-function addOrderedNotPickedUp(productId: string, quantity: number) {
-  const p = getProductById(productId);
-  if (p) p.orderedNotPickedUpCount += quantity;
+async function addOrderedNotPickedUp(productId: string, quantity: number) {
+  await incrementOrderedNotPickedUp(productId, quantity);
 }
 
 export function registerAllocationRoutes(router: IRouter) {
   // GET /api/products/:productId/allocations - list allocations for a product
   router.get("/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
-    const product = getProductById(productId);
+    const product = await getProductById(productId);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
@@ -56,7 +55,7 @@ export function registerAllocationRoutes(router: IRouter) {
   // Body: { quantityPerPerson, targetType: 'club'|'members', clubCode?, memberIds?, pullFromInventory: boolean }
   router.post("/products/:productId/allocations", async (req: Request, res: Response) => {
     const { productId } = req.params;
-    const product = getProductById(productId);
+    const product = await getProductById(productId);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
@@ -120,7 +119,7 @@ export function registerAllocationRoutes(router: IRouter) {
           available: product.inventoryQuantity
         });
       }
-      const ok = decrementProductInventory(productId, totalQuantity);
+      const ok = await decrementProductInventory(productId, totalQuantity);
       if (!ok) {
         return res.status(400).json({ error: "Insufficient inventory" });
       }
@@ -161,9 +160,7 @@ export function registerAllocationRoutes(router: IRouter) {
         pickedUpAt: null
       }))
     );
-    for (let i = 0; i < memberIds.length; i++) {
-      addOrderedNotPickedUp(productId, qty);
-    }
+    await addOrderedNotPickedUp(productId, qty * memberIds.length);
 
     res.status(201).json(allocation);
   });

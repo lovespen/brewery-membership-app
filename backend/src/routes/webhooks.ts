@@ -4,7 +4,7 @@ import { getStripeSecretKey, getStripeWebhookSecret } from "./config";
 import { addTipCents } from "./tips";
 import { addSalesTaxRecord } from "../stores/salesTaxRecords";
 import { addEntitlements } from "../stores/entitlements";
-import { getProductById } from "./products";
+import { getProductById, incrementOrderedNotPickedUp } from "./products";
 
 export async function handleStripeWebhook(req: Request, res: Response): Promise<void> {
   const secret = getStripeWebhookSecret();
@@ -54,7 +54,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
           const entries: { userId: string; productId: string; quantity: number; status: "NOT_READY" | "READY_FOR_PICKUP"; source: "PREORDER" | "ORDER"; releaseAt: string | null; pickedUpAt: null }[] = [];
           for (const item of cartItems) {
             if (!item?.productId || typeof item.quantity !== "number" || item.quantity < 1) continue;
-            const product = getProductById(item.productId);
+            const product = await getProductById(item.productId);
             if (!product) continue;
             const qty = Math.floor(item.quantity);
             if (product.isPreorder) {
@@ -82,8 +82,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
           if (entries.length > 0) {
             addEntitlements(entries);
             for (const e of entries) {
-              const p = getProductById(e.productId);
-              if (p) p.orderedNotPickedUpCount += e.quantity;
+              await incrementOrderedNotPickedUp(e.productId, e.quantity);
             }
           }
         }

@@ -1,11 +1,12 @@
 import type { IRouter } from "express";
 import { Request, Response } from "express";
-import { getClubCodes } from "./clubs";
+import { getClubCodes, getClubByCode } from "./clubs";
+import { prisma } from "../db";
 
 /** Club code string; valid values come from GET /api/clubs (admin-defined). */
 export type ClubCode = string;
 
-type InMemoryProduct = {
+export type ProductPayload = {
   id: string;
   name: string;
   description?: string;
@@ -18,42 +19,62 @@ type InMemoryProduct = {
   preorderEndAt?: string | null;
   releaseAt?: string | null;
   isActive: boolean;
-  /** Number of units ordered but not yet picked up (preorder + ready-for-pickup). */
   orderedNotPickedUpCount: number;
-  /** Available inventory; used when pullFromInventory is true on allocations. */
   inventoryQuantity: number;
-  /** Optional tax rate id from config/tax-rates; null = no tax. */
   taxRateId: string | null;
 };
 
-// Very simple in-memory product store just for local preview.
-// This resets whenever the backend restarts.
-const products: InMemoryProduct[] = [
-  {
-    id: "seed-wood-1",
-    name: "Barrel-Aged Stout 2026",
-    description: "Wood Club release. Limit 2 per member.",
-    basePriceCents: 3400,
-    currency: "USD",
-    allowedClubs: ["WOOD", "FOUNDERS"],
-    clubPrices: [{ clubCode: "WOOD", priceCents: 3000 }],
-    isPreorder: true,
-    preorderStartAt: "2025-01-01T00:00:00",
-    preorderEndAt: "2026-12-31T23:59:59",
-    releaseAt: "2026-05-01T00:00:00",
-    isActive: true,
-    orderedNotPickedUpCount: 0,
-    inventoryQuantity: 0,
-    taxRateId: null
-  }
-];
-
-export function getProductById(id: string): InMemoryProduct | undefined {
-  return products.find((p) => p.id === id);
+function toProductPayload(row: {
+  id: string;
+  name: string;
+  description: string | null;
+  basePriceCents: number;
+  currency: string;
+  isPreorder: boolean;
+  preorderStartAt: Date | null;
+  preorderEndAt: Date | null;
+  releaseAt: Date | null;
+  isActive: boolean;
+  orderedNotPickedUpCount: number;
+  inventoryQuantity: number;
+  taxRateId: string | null;
+  allowedClubs: { club: { code: string } }[];
+  prices: { clubId: string | null; priceCents: number; club: { code: string } | null }[];
+}): ProductPayload {
+  const allowedClubs = row.allowedClubs.map((a) => a.club.code);
+  const clubPrices = row.prices
+    .filter((p) => p.clubId != null && p.club != null)
+    .map((p) => ({ clubCode: p.club!.code, priceCents: p.priceCents }));
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    basePriceCents: row.basePriceCents,
+    currency: row.currency,
+    allowedClubs,
+    clubPrices,
+    isPreorder: row.isPreorder,
+    preorderStartAt: row.preorderStartAt?.toISOString() ?? null,
+    preorderEndAt: row.preorderEndAt?.toISOString() ?? null,
+    releaseAt: row.releaseAt?.toISOString() ?? null,
+    isActive: row.isActive,
+    orderedNotPickedUpCount: row.orderedNotPickedUpCount,
+    inventoryQuantity: row.inventoryQuantity,
+    taxRateId: row.taxRateId
+  };
 }
 
+const productInclude = {
+  allowedClubs: { include: { club: { select: { code: true } } } },
+  prices: { include: { club: { select: { code: true } } } }
+} as const;
+
 /** True if product is preorder and current time is within preorderStartAt..preorderEndAt (inclusive). */
-export function isWithinPreorderWindow(p: InMemoryProduct): boolean {
+export function isWithinPreorderWindow(p: {
+  isPreorder: boolean;
+  preorderStartAt?: string | null;
+  preorderEndAt?: string | null;
+}): boolean {
   if (!p.isPreorder || !p.preorderStartAt || !p.preorderEndAt) return false;
   const now = Date.now();
   const start = new Date(p.preorderStartAt).getTime();
@@ -62,9 +83,21 @@ export function isWithinPreorderWindow(p: InMemoryProduct): boolean {
   return now >= start && now <= end;
 }
 
+export async function getProductById(id: string): Promise<ProductPayload | undefined> {
+  const row = await prisma.product.findUnique({
+    where: { id },
+    include: productInclude
+  });
+  if (!row) return undefined;
+  return toProductPayload(row);
+}
+
 /** Returns price in cents for product; optional clubCode for club-specific price. */
-export function getProductPriceCents(productId: string, clubCode?: ClubCode): number | null {
-  const p = getProductById(productId);
+export async function getProductPriceCents(
+  productId: string,
+  clubCode?: ClubCode
+): Promise<number | null> {
+  const p = await getProductById(productId);
   if (!p) return null;
   if (clubCode) {
     const cp = p.clubPrices.find((c) => c.clubCode === clubCode);
@@ -74,16 +107,31 @@ export function getProductPriceCents(productId: string, clubCode?: ClubCode): nu
 }
 
 /** Decrements product inventory by amount. Returns true if enough stock, false otherwise. */
-export function decrementProductInventory(productId: string, amount: number): boolean {
-  const p = products.find((x) => x.id === productId);
-  if (!p || p.inventoryQuantity < amount) return false;
-  p.inventoryQuantity -= amount;
+export async function decrementProductInventory(
+  productId: string,
+  amount: number
+): Promise<boolean> {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product || product.inventoryQuantity < amount) return false;
+  await prisma.product.update({
+    where: { id: productId },
+    data: { inventoryQuantity: product.inventoryQuantity - amount }
+  });
   return true;
 }
 
+/** Increment orderedNotPickedUpCount (e.g. after allocation or purchase). */
+export async function incrementOrderedNotPickedUp(
+  productId: string,
+  quantity: number
+): Promise<void> {
+  await prisma.product.update({
+    where: { id: productId },
+    data: { orderedNotPickedUpCount: { increment: quantity } }
+  });
+}
+
 export function registerProductRoutes(router: IRouter) {
-  // GET /api/products - list products (optionally filtered by club)
-  // For shop (includeInactive=false): preorder products only appear when within preorder window.
   router.get("/products", async (req: Request, res: Response) => {
     const clubCode = (req.query.clubCode as string | undefined)?.toUpperCase() as
       | ClubCode
@@ -100,27 +148,32 @@ export function registerProductRoutes(router: IRouter) {
         : [];
     const includeInactive = req.query.includeInactive === "true";
 
-    let list = includeInactive
-      ? [...products]
-      : products.filter((p) => p.isActive);
+    let list = await prisma.product.findMany({
+      where: includeInactive ? {} : { isActive: true },
+      include: productInclude
+    });
 
     if (clubCodes.length > 0) {
-      list = list.filter((p) => clubCodes.some((cc) => p.allowedClubs.includes(cc)));
+      list = list.filter((p) =>
+        p.allowedClubs.some((a) => clubCodes.includes(a.club.code))
+      );
     }
 
-    // Shop view: preorder products only available during their window
     if (!includeInactive) {
       list = list.filter((p) => {
         if (!p.isPreorder) return true;
-        return isWithinPreorderWindow(p);
+        return isWithinPreorderWindow({
+          isPreorder: p.isPreorder,
+          preorderStartAt: p.preorderStartAt?.toISOString() ?? null,
+          preorderEndAt: p.preorderEndAt?.toISOString() ?? null
+        });
       });
     }
 
-    res.json(list);
+    res.json(list.map(toProductPayload));
   });
 
-  // POST /api/products - create product with allowed clubs and pricing (admin)
-  router.post("/products", (req: Request, res: Response) => {
+  router.post("/products", async (req: Request, res: Response) => {
     const {
       name,
       description,
@@ -142,28 +195,24 @@ export function registerProductRoutes(router: IRouter) {
       });
     }
 
-    const id = `p_${Date.now().toString(36)}_${Math.random()
-      .toString(36)
-      .slice(2, 7)}`;
-
-    const allowedClubs: ClubCode[] = Array.isArray(allowedClubIds)
-      ? (allowedClubIds
-          .map((c: string) => c.toUpperCase())
+    const allowedClubCodes: ClubCode[] = Array.isArray(allowedClubIds)
+      ? (allowedClubIds as string[])
+          .map((c: string) => (c || "").toUpperCase())
           .filter((c: string) =>
             ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(c)
-          ) as ClubCode[])
+          )
       : [];
 
     const normalizedClubPrices: { clubCode: ClubCode; priceCents: number }[] =
       Array.isArray(clubPrices)
         ? clubPrices
             .filter(
-              (cp: any) =>
+              (cp: { clubCode?: string; priceCents?: number }) =>
                 cp &&
                 typeof cp.clubCode === "string" &&
                 typeof cp.priceCents === "number"
             )
-            .map((cp: any) => ({
+            .map((cp: { clubCode: string; priceCents: number }) => ({
               clubCode: cp.clubCode.toUpperCase() as ClubCode,
               priceCents: cp.priceCents
             }))
@@ -172,49 +221,80 @@ export function registerProductRoutes(router: IRouter) {
             )
         : [];
 
-    const product: InMemoryProduct = {
-      id,
-      name,
-      description,
-      basePriceCents,
-      currency,
-      allowedClubs,
-      clubPrices: normalizedClubPrices,
-      isPreorder: !!isPreorder,
-      preorderStartAt: isPreorder ? preorderStartAt ?? null : null,
-      preorderEndAt: isPreorder ? preorderEndAt ?? null : null,
-      releaseAt: isPreorder ? releaseAt ?? null : null,
-      isActive: true,
-      orderedNotPickedUpCount: 0,
-      inventoryQuantity:
-        typeof initialInventory === "number" && initialInventory >= 0
-          ? Math.floor(initialInventory)
-          : 0,
-      taxRateId: typeof taxRateId === "string" && taxRateId.trim() !== "" ? taxRateId.trim() : null
-    };
+    const clubIds: string[] = [];
+    for (const code of allowedClubCodes) {
+      const club = await getClubByCode(code);
+      if (club) clubIds.push(club.id);
+    }
 
-    products.push(product);
+    const priceCreates: { clubId: string; priceCents: number; currency: string }[] = [];
+    for (const cp of normalizedClubPrices) {
+      const club = await getClubByCode(cp.clubCode);
+      if (club) {
+        priceCreates.push({
+          clubId: club.id,
+          priceCents: cp.priceCents,
+          currency: currency || "USD"
+        });
+      }
+    }
 
-    res.status(201).json(product);
+    const product = await prisma.product.create({
+      data: {
+        name: String(name).trim(),
+        description:
+          typeof description === "string" ? description.trim() || null : null,
+        basePriceCents:
+          typeof basePriceCents === "number" && basePriceCents >= 0
+            ? basePriceCents
+            : 0,
+        currency: currency || "USD",
+        isPreorder: !!isPreorder,
+        preorderStartAt:
+          isPreorder && preorderStartAt
+            ? new Date(preorderStartAt)
+            : null,
+        preorderEndAt:
+          isPreorder && preorderEndAt ? new Date(preorderEndAt) : null,
+        releaseAt: isPreorder && releaseAt ? new Date(releaseAt) : null,
+        taxRateId:
+          typeof taxRateId === "string" && taxRateId.trim()
+            ? taxRateId.trim()
+            : null,
+        inventoryQuantity:
+          typeof initialInventory === "number" && initialInventory >= 0
+            ? Math.floor(initialInventory)
+            : 0,
+        allowedClubs: {
+          create: clubIds.map((clubId) => ({ clubId }))
+        },
+        prices: { create: priceCreates }
+      },
+      include: productInclude
+    });
+
+    const payload = toProductPayload(product);
+    res.status(201).json(payload);
   });
 
-  // GET /api/products/:id - get single product (for editing)
-  router.get("/products/:id", (req: Request, res: Response) => {
-    const { id } = req.params;
-    const product = products.find((p) => p.id === id);
+  router.get("/products/:id", async (req: Request, res: Response) => {
+    const product = await getProductById(req.params.id);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
     res.json(product);
   });
 
-  // PATCH /api/products/:id - update product (inventory, sale status, or full edit)
-  router.patch("/products/:id", (req: Request, res: Response) => {
+  router.patch("/products/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
-    const product = products.find((p) => p.id === id);
-    if (!product) {
+    const existing = await prisma.product.findUnique({
+      where: { id },
+      include: productInclude
+    });
+    if (!existing) {
       return res.status(404).json({ error: "Product not found" });
     }
+
     const {
       inventoryQuantity,
       taxRateId,
@@ -230,96 +310,141 @@ export function registerProductRoutes(router: IRouter) {
       releaseAt
     } = req.body;
 
+    const data: {
+      inventoryQuantity?: number;
+      taxRateId?: string | null;
+      isActive?: boolean;
+      name?: string;
+      description?: string | null;
+      basePriceCents?: number;
+      isPreorder?: boolean;
+      preorderStartAt?: Date | null;
+      preorderEndAt?: Date | null;
+      releaseAt?: Date | null;
+    } = {};
+
     if (typeof inventoryQuantity === "number" && inventoryQuantity >= 0) {
-      product.inventoryQuantity = Math.floor(inventoryQuantity);
+      data.inventoryQuantity = Math.floor(inventoryQuantity);
     }
     if (taxRateId !== undefined) {
-      product.taxRateId =
-        typeof taxRateId === "string" && taxRateId.trim() !== ""
+      data.taxRateId =
+        typeof taxRateId === "string" && taxRateId.trim()
           ? taxRateId.trim()
           : null;
     }
     if (typeof isActive === "boolean") {
-      product.isActive = isActive;
+      data.isActive = isActive;
     }
     if (typeof name === "string" && name.trim()) {
-      product.name = name.trim();
+      data.name = name.trim();
     }
     if (description !== undefined) {
-      product.description =
-        typeof description === "string" ? description : undefined;
+      data.description =
+        typeof description === "string" ? description.trim() || null : null;
     }
     if (typeof basePriceCents === "number" && basePriceCents >= 0) {
-      product.basePriceCents = basePriceCents;
-    }
-    if (Array.isArray(allowedClubIds)) {
-      const allowedClubs: ClubCode[] = allowedClubIds
-        .map((c: string) => (c || "").toUpperCase())
-        .filter((c: string) =>
-          ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(c)
-        ) as ClubCode[];
-      product.allowedClubs = allowedClubs;
-    }
-    if (Array.isArray(clubPrices)) {
-      const normalizedClubPrices: { clubCode: ClubCode; priceCents: number }[] =
-        clubPrices
-          .filter(
-            (cp: any) =>
-              cp &&
-              typeof cp.clubCode === "string" &&
-              typeof cp.priceCents === "number"
-          )
-          .map((cp: any) => ({
-            clubCode: cp.clubCode.toUpperCase() as ClubCode,
-            priceCents: cp.priceCents
-          }))
-          .filter((cp) =>
-            ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(cp.clubCode)
-          );
-      product.clubPrices = normalizedClubPrices;
+      data.basePriceCents = basePriceCents;
     }
     if (typeof isPreorder === "boolean") {
-      product.isPreorder = isPreorder;
-      product.preorderStartAt = isPreorder ? preorderStartAt ?? null : null;
-      product.preorderEndAt = isPreorder ? preorderEndAt ?? null : null;
-      product.releaseAt = isPreorder ? releaseAt ?? null : null;
+      data.isPreorder = isPreorder;
+      data.preorderStartAt =
+        isPreorder && preorderStartAt ? new Date(preorderStartAt) : null;
+      data.preorderEndAt =
+        isPreorder && preorderEndAt ? new Date(preorderEndAt) : null;
+      data.releaseAt = isPreorder && releaseAt ? new Date(releaseAt) : null;
     } else if (
-      product.isPreorder &&
+      existing.isPreorder &&
       (preorderStartAt !== undefined ||
         preorderEndAt !== undefined ||
         releaseAt !== undefined)
     ) {
-      if (preorderStartAt !== undefined) product.preorderStartAt = preorderStartAt ?? null;
-      if (preorderEndAt !== undefined) product.preorderEndAt = preorderEndAt ?? null;
-      if (releaseAt !== undefined) product.releaseAt = releaseAt ?? null;
+      if (preorderStartAt !== undefined) {
+        data.preorderStartAt = preorderStartAt
+          ? new Date(preorderStartAt)
+          : null;
+      }
+      if (preorderEndAt !== undefined) {
+        data.preorderEndAt = preorderEndAt ? new Date(preorderEndAt) : null;
+      }
+      if (releaseAt !== undefined) {
+        data.releaseAt = releaseAt ? new Date(releaseAt) : null;
+      }
     }
-    res.json(product);
+
+    await prisma.product.update({ where: { id }, data });
+
+    if (Array.isArray(allowedClubIds)) {
+      const codes = (allowedClubIds as string[])
+        .map((c) => (c || "").toUpperCase())
+        .filter((c) =>
+          ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(c)
+        );
+      const clubIds: string[] = [];
+      for (const code of codes) {
+        const club = await getClubByCode(code);
+        if (club) clubIds.push(club.id);
+      }
+      await prisma.productAllowedClub.deleteMany({ where: { productId: id } });
+      await prisma.productAllowedClub.createMany({
+        data: clubIds.map((clubId) => ({ productId: id, clubId }))
+      });
+    }
+
+    if (Array.isArray(clubPrices)) {
+      const normalized = clubPrices
+        .filter(
+          (cp: { clubCode?: string; priceCents?: number }) =>
+            cp &&
+            typeof cp.clubCode === "string" &&
+            typeof cp.priceCents === "number"
+        )
+        .map((cp: { clubCode: string; priceCents: number }) => ({
+          clubCode: cp.clubCode.toUpperCase(),
+          priceCents: cp.priceCents
+        }))
+        .filter((cp) =>
+          ["SAP", "WOOD", "CELLARS", "FOUNDERS"].includes(cp.clubCode)
+        );
+      await prisma.productPrice.deleteMany({ where: { productId: id } });
+      for (const cp of normalized) {
+        const club = await getClubByCode(cp.clubCode);
+        if (club) {
+          await prisma.productPrice.create({
+            data: {
+              productId: id,
+              clubId: club.id,
+              priceCents: cp.priceCents,
+              currency: existing.currency || "USD"
+            }
+          });
+        }
+      }
+    }
+
+    const updated = await getProductById(id);
+    res.json(updated);
   });
 
-  // DELETE /api/products/:id - remove product completely
-  router.delete("/products/:id", (req: Request, res: Response) => {
+  router.delete("/products/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
-    const idx = products.findIndex((p) => p.id === id);
-    if (idx === -1) {
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
       return res.status(404).json({ error: "Product not found" });
     }
-    products.splice(idx, 1);
+    await prisma.product.delete({ where: { id } });
     res.status(204).send();
   });
 
-  // GET /api/products/:id/pricing - view per-club pricing for a product
-  router.get("/products/:id/pricing", (req: Request, res: Response) => {
-    const { id } = req.params;
-    const product = products.find((p) => p.id === id);
+  router.get("/products/:id/pricing", async (req: Request, res: Response) => {
+    const product = await getProductById(req.params.id);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
     res.json({
-      productId: id,
+      productId: product.id,
       defaultPriceCents: product.basePriceCents,
       currency: product.currency,
       clubPrices: product.clubPrices
     });
   });
 }
-

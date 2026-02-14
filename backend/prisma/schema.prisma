@@ -93,6 +93,8 @@ model Product {
   description String?
   sku         String?  @unique
   isActive    Boolean  @default(true)
+  basePriceCents Int   @default(0)
+  orderedNotPickedUpCount Int @default(0)
 
   // Inventory and allocation
   inventoryQuantity Int      @default(0)

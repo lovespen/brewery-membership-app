@@ -19,8 +19,8 @@ async function computeCartTotal(
   let subtotalCents = 0;
   const taxByRateId: Record<string, number> = {};
   for (const { productId, quantity } of cartItems) {
-    const product = getProductById(productId);
-    const price = getProductPriceCents(productId, memberClubCode);
+    const product = await getProductById(productId);
+    const price = await getProductPriceCents(productId, memberClubCode);
     if (!product || price === null || quantity <= 0) continue;
     const lineTotal = price * quantity;
     subtotalCents += lineTotal;
@@ -79,7 +79,7 @@ export function registerCheckoutRoutes(router: IRouter) {
 
     // Preorder products must be within their purchase window
     for (const item of validItems) {
-      const product = getProductById((item as { productId: string }).productId);
+      const product = await getProductById((item as { productId: string }).productId);
       if (product?.isPreorder && !isWithinPreorderWindow(product)) {
         return res.status(400).json({
           error: "One or more preorder items are outside the purchase window",

@@ -44,7 +44,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
     const rows: PickupRow[] = await Promise.all(
       relevant.map(async (e) => {
         const { name, email } = await resolveDisplayName(e.userId);
-        const product = getProductById(e.productId);
+        const product = await getProductById(e.productId);
         return {
           id: e.id,
           userId: e.userId,
@@ -78,17 +78,19 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
     const forMember = all.filter(
       (e) => e.userId === memberId && (e.status === "READY_FOR_PICKUP" || e.status === "PICKED_UP")
     );
-    const pickups = forMember.map((e) => {
-      const product = getProductById(e.productId);
-      return {
-        id: e.id,
-        productId: e.productId,
-        productName: product?.name ?? e.productId,
-        quantity: e.quantity,
-        status: e.status,
-        pickedUpAt: e.pickedUpAt
-      };
-    });
+    const pickups = await Promise.all(
+      forMember.map(async (e) => {
+        const product = await getProductById(e.productId);
+        return {
+          id: e.id,
+          productId: e.productId,
+          productName: product?.name ?? e.productId,
+          quantity: e.quantity,
+          status: e.status,
+          pickedUpAt: e.pickedUpAt
+        };
+      })
+    );
     res.json({
       member,
       pickups
