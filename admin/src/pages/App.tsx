@@ -9,10 +9,12 @@ function clubLabelFromList(clubs: { code: string; name: string }[] | null, code:
   return clubs.find((c) => c.code === code)?.name ?? code;
 }
 
-/** Default preorder date strings to 12:00 AM when only a date (YYYY-MM-DD) is provided. */
+/** Normalize preorder date to 12:00 AM (midnight) for display and API. Extracts YYYY-MM-DD from any datetime string. */
 function preorderDateToMidnight(s: string): string {
-  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return s;
-  return s.trim() + "T00:00";
+  if (!s || !s.trim()) return s;
+  const match = s.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!match) return s;
+  return match[1] + "T00:00";
 }
 
 type ClubPrice = {
@@ -282,11 +284,16 @@ export const App: React.FC = () => {
       if (!membershipClub || !clubsFromApi.some((c) => c.code === membershipClub)) {
         setMembershipClub(clubsFromApi[0].code);
       }
-      setClubPrices((prev) =>
-        prev.length === 0
-          ? clubsFromApi.map((c) => ({ clubCode: c.code, priceCents: "" as number | "" }))
-          : prev
-      );
+      setClubPrices((prev) => {
+        const clubs = clubsFromApi ?? [];
+        if (prev.length === 0) {
+          return clubs.map((c) => ({ clubCode: c.code, priceCents: "" as number | "" }));
+        }
+        const existingCodes = new Set(prev.map((cp) => cp.clubCode));
+        const missing = clubs.filter((c) => !existingCodes.has(c.code));
+        if (missing.length === 0) return prev;
+        return [...prev, ...missing.map((c) => ({ clubCode: c.code, priceCents: "" as number | "" }))];
+      });
     }
   }, [clubsFromApi]);
 
@@ -541,12 +548,23 @@ export const App: React.FC = () => {
   };
 
   const updateClubPrice = (code: ClubCode, value: string) => {
-    const parsed = value === "" ? "" : Number(value) * 100;
-    setClubPrices((prev) =>
-      prev.map((cp) =>
-        cp.clubCode === code ? { ...cp, priceCents: parsed } : cp
-      )
-    );
+    const trimmed = value.trim();
+    const parsed =
+      trimmed === ""
+        ? (""
+          as number | "")
+        : Math.round(parseFloat(trimmed) * 100);
+    const parsedCents =
+      trimmed !== "" && !Number.isNaN(parsed) && parsed >= 0 ? parsed : ("" as number | "");
+    setClubPrices((prev) => {
+      const idx = prev.findIndex((cp) => cp.clubCode === code);
+      if (idx >= 0) {
+        return prev.map((cp, i) =>
+          i === idx ? { ...cp, priceCents: trimmed === "" ? "" : parsedCents } : cp
+        );
+      }
+      return [...prev, { clubCode: code, priceCents: trimmed === "" ? "" : parsedCents }];
+    });
   };
 
   const resetProductForm = React.useCallback(() => {
@@ -1798,12 +1816,13 @@ export const App: React.FC = () => {
                       >
                         <span style={{ fontSize: 12 }}>{club.name}</span>
                         <input
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={
                             entry && typeof entry.priceCents === "number"
-                              ? (entry.priceCents / 100).toString()
+                              ? (entry.priceCents / 100) % 1 === 0
+                                ? (entry.priceCents / 100).toString()
+                                : (entry.priceCents / 100).toFixed(2)
                               : ""
                           }
                           onChange={(e) =>
