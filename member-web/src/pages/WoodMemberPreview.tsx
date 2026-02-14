@@ -135,7 +135,7 @@ function JoinClubCard({
   const isLong = desc.length > JOIN_DESC_PREVIEW_LEN;
   const showText = isLong && !expanded ? `${desc.slice(0, JOIN_DESC_PREVIEW_LEN).trim()}…` : desc;
   return (
-    <div style={styles.joinCard}>
+    <div className="member-join-card" style={styles.joinCard}>
       <div style={styles.productTitle}>{offering.name}</div>
       <div
         style={{
@@ -174,6 +174,7 @@ function JoinClubCard({
       </div>
       <button
         type="button"
+        className="member-primary-btn"
         style={styles.primaryBtn}
         onClick={() => startCheckout(offering.id)}
         disabled={offering.priceCents <= 0}
@@ -786,8 +787,8 @@ export const MemberPreview: React.FC = () => {
   );
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
+    <div className="member-page" style={styles.page}>
+      <header className="member-header" style={styles.header}>
         <div>
           <div style={styles.brand}>Sapwood Cellars</div>
           <h1 style={styles.h1}>
@@ -799,7 +800,7 @@ export const MemberPreview: React.FC = () => {
               : `Viewing as: ${member.clubs.map((c) => getClubLabel(clubsFromApi, c)).join(", ")} • ${member.year}`}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="member-header-actions" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {!isGuest && pushStatus === "prompt" && (
             <button
               type="button"
@@ -835,7 +836,7 @@ export const MemberPreview: React.FC = () => {
             <span style={{ fontSize: 12, color: "#8a8cab" }}>Loading…</span>
           ) : loggedInMember ? (
             <>
-              <div style={styles.pill}>
+              <div className="member-pill" style={styles.pill}>
                 Logged in as {loggedInMember.name || loggedInMember.email}
                 {member.clubs.length > 0 ? ` • ${member.clubs.map((c) => getClubLabel(clubsFromApi, c)).join(", ")}` : ""}
               </div>
@@ -946,7 +947,7 @@ export const MemberPreview: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <div style={styles.pill}>
+              <div className="member-pill" style={styles.pill}>
                 {member.name}
                 {member.clubs.length > 0 ? ` • ${member.clubs.map((c) => getClubLabel(clubsFromApi, c)).join(", ")}` : " • Not a member"}
               </div>
@@ -1190,18 +1191,18 @@ export const MemberPreview: React.FC = () => {
       )}
 
       {!isGuest && (
-        <section style={styles.grid3}>
-          <div style={{ ...styles.tile, ...styles.tileAccent }}>
+        <section className="member-grid3" style={styles.grid3}>
+          <div className="member-tile" style={{ ...styles.tile, ...styles.tileAccent }}>
             <div style={styles.tileLabel}>Ready for pickup</div>
             <div style={styles.tileValue}>{pickupReady.length}</div>
             <div style={styles.tileHint}>Items waiting at the brewery</div>
           </div>
-          <div style={styles.tile}>
+          <div className="member-tile" style={styles.tile}>
             <div style={styles.tileLabel}>Upcoming preorders</div>
             <div style={styles.tileValue}>{upcomingPreorders.length}</div>
             <div style={styles.tileHint}>Paid items that will move to pickup</div>
           </div>
-          <div style={styles.tile}>
+          <div className="member-tile" style={styles.tile}>
             <div style={styles.tileLabel}>Eligible products</div>
             <div style={styles.tileValue}>{eligible.length}</div>
             <div style={styles.tileHint}>Only items allowed for your club(s)</div>
@@ -1209,17 +1210,17 @@ export const MemberPreview: React.FC = () => {
         </section>
       )}
 
-      <div style={styles.grid2}>
+      <div className="member-grid2" style={styles.grid2}>
         {!isGuest && (
-          <section style={styles.card}>
-            <h2 style={styles.h2}>Pickup items</h2>
+          <section className="member-card" style={styles.card}>
+            <h2 className="member-h2" style={styles.h2}>Pickup items</h2>
             <>
               <div style={styles.cardSub}>Ready</div>
               {pickupReady.map((i) => (
-                <div key={i.id} style={styles.row}>
+                <div key={i.id} className="member-row" style={styles.row}>
                   <div>
-                    <div style={styles.rowTitle}>{i.name}</div>
-                    <div style={styles.rowMeta}>Qty: {i.quantity}</div>
+                    <div className="member-row-title" style={styles.rowTitle}>{i.name}</div>
+                    <div className="member-row-meta" style={styles.rowMeta}>Qty: {i.quantity}</div>
                   </div>
                   <span style={{ ...styles.badge, ...styles.badgeReady }}>
                     {i.status}
@@ -1230,10 +1231,10 @@ export const MemberPreview: React.FC = () => {
                 Upcoming preorders
               </div>
               {upcomingPreorders.map((i) => (
-                <div key={i.id} style={styles.row}>
+                <div key={i.id} className="member-row" style={styles.row}>
                   <div>
-                    <div style={styles.rowTitle}>{i.name}</div>
-                    <div style={styles.rowMeta}>
+                    <div className="member-row-title" style={styles.rowTitle}>{i.name}</div>
+                    <div className="member-row-meta" style={styles.rowMeta}>
                       Qty: {i.quantity} • Releases {i.release}
                     </div>
                   </div>
@@ -1291,16 +1292,16 @@ export const MemberPreview: React.FC = () => {
           </section>
         )}
 
-        <section style={{ ...styles.card, ...(isGuest ? { gridColumn: "1 / -1" } : {}) }}>
-          <h2 style={styles.h2}>Order via Toast</h2>
+        <section className="member-card" style={{ ...styles.card, ...(isGuest ? { gridColumn: "1 / -1" } : {}) }}>
+          <h2 className="member-h2" style={styles.h2}>Order via Toast</h2>
           {!isGuest && (
-            <div style={styles.toastHeader}>
+            <div className="member-toast-header" style={styles.toastHeader}>
               <div style={{ fontSize: 13, marginBottom: 6 }}>
                 Your clubs: {member.clubs.map((c) => getClubLabel(clubsFromApi, c)).join(", ")}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {member.toastPromoCodes.map((p) => (
-                  <span key={p.club} style={styles.codeChip}>
+                  <span key={p.club} className="member-code-chip" style={styles.codeChip}>
                     {getClubLabel(clubsFromApi, p.club)} code: <strong>{p.code}</strong>
                   </span>
                 ))}
@@ -1326,27 +1327,29 @@ export const MemberPreview: React.FC = () => {
             </p>
             <button
               type="button"
+              className="member-primary-btn"
               style={styles.openToastButton}
               onClick={() => window.open(TOAST_URL, "_blank", "noopener,noreferrer")}
             >
               Open Toast to order
             </button>
             {isGuest && (
-              <button
-                type="button"
-                style={styles.secondaryBtn}
-                onClick={() => setShowCreateAccountForm(true)}
-              >
-                Create account
-              </button>
+            <button
+              type="button"
+              className="member-secondary-btn"
+              style={styles.secondaryBtn}
+              onClick={() => setShowCreateAccountForm(true)}
+            >
+              Create account
+            </button>
             )}
           </div>
         </section>
       </div>
 
       {showJoinSection ? (
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Join a club</h2>
+        <section className="member-card" style={styles.card}>
+          <h2 className="member-h2" style={styles.h2}>Join a club</h2>
           <p style={{ fontSize: 13, color: "#a3a3bf", marginTop: 0, marginBottom: 14 }}>
             {hasNoClubs
               ? "You don't have a club membership yet. Purchase one below to get member-only releases, Toast discounts, and pickup perks."
@@ -1374,7 +1377,7 @@ export const MemberPreview: React.FC = () => {
               );
             }
             return (
-              <div style={styles.joinGrid}>
+              <div className="member-join-grid" style={styles.joinGrid}>
                 {visibleOfferings.map((offering) => (
                   <JoinClubCard
                     key={offering.id}
@@ -1505,9 +1508,9 @@ export const MemberPreview: React.FC = () => {
           )}
         </section>
       ) : (
-        <section style={styles.card}>
-          <div style={styles.sectionHead}>
-            <h2 style={styles.h2}>Club exclusive items</h2>
+        <section className="member-card" style={styles.card}>
+          <div className="member-section-head" style={styles.sectionHead}>
+            <h2 className="member-h2" style={styles.h2}>Club exclusive items</h2>
             <div style={styles.cardSub}>
               {member.clubs.length > 0 && member.clubs[0]
                 ? `${getClubLabel(clubsFromApi, member.clubs[0])} pricing shown`
@@ -1515,18 +1518,18 @@ export const MemberPreview: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.productGrid}>
+          <div className="member-product-grid" style={styles.productGrid}>
             {eligible.map((p) => {
               const price = computeMemberPriceCents(p, member.clubs);
               const isOverride = price !== p.basePriceCents;
               const firstClub = member.clubs[0];
               return (
-                <div key={p.id} style={styles.productCard}>
-                  <div style={styles.productTitle}>{p.name}</div>
-                  <div style={styles.productMeta}>
+                <div key={p.id} className="member-product-card" style={styles.productCard}>
+                  <div className="member-product-title" style={styles.productTitle}>{p.name}</div>
+                  <div className="member-product-meta" style={styles.productMeta}>
                     Available to: {p.allowedClubs.map((c) => getClubLabel(clubsFromApi, c)).join(", ")}
                   </div>
-                  <div style={styles.productDesc}>{p.description}</div>
+                  <div className="member-product-desc" style={styles.productDesc}>{p.description}</div>
 
                   <div style={styles.priceRow}>
                     <div style={styles.priceMain}>{formatUSD(price)}</div>
@@ -1547,6 +1550,7 @@ export const MemberPreview: React.FC = () => {
                         Moves to pickup: {p.preorderWindow.release}
                       </div>
                       <button
+                        className="member-primary-btn"
                         style={styles.primaryBtn}
                         type="button"
                         onClick={() => addToCart(p.id, 1)}
@@ -1556,6 +1560,7 @@ export const MemberPreview: React.FC = () => {
                     </div>
                   ) : (
                     <button
+                      className="member-primary-btn"
                       style={styles.primaryBtn}
                       type="button"
                       onClick={() => addToCart(p.id, 1)}

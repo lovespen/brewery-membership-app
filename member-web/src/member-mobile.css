@@ -1,0 +1,126 @@
+/* Member app: cleaner layout on small screens */
+@media (max-width: 768px) {
+  .member-page {
+    padding: 1rem !important;
+  }
+
+  .member-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  .member-header-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  .member-header-actions form {
+    flex-direction: column !important;
+  }
+
+  .member-header-actions form input,
+  .member-header-actions form button {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .member-header-actions > button {
+    min-height: 44px;
+  }
+
+  .member-header-actions .member-pill {
+    text-align: center;
+    padding: 0.6rem 0.75rem !important;
+  }
+
+  .member-grid3 {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .member-grid3 .member-tile {
+    padding: 1.1rem 1.15rem !important;
+  }
+
+  .member-grid2 {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .member-card {
+    padding: 1.25rem 1rem 1.5rem !important;
+  }
+
+  .member-product-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    margin-top: 1rem !important;
+  }
+
+  .member-product-card {
+    padding: 1.1rem 1rem !important;
+  }
+
+  .member-product-title {
+    font-size: 15px !important;
+  }
+
+  .member-product-meta,
+  .member-product-desc {
+    font-size: 12px !important;
+  }
+
+  .member-primary-btn,
+  .member-secondary-btn {
+    min-height: 44px !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 15px !important;
+  }
+
+  .member-join-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  .member-join-card {
+    padding: 1.15rem 1rem !important;
+  }
+
+  .member-row {
+    padding: 0.9rem 1rem !important;
+    margin-top: 0.75rem !important;
+  }
+
+  .member-row-title {
+    font-size: 14px !important;
+  }
+
+  .member-row-meta {
+    font-size: 12px !important;
+  }
+
+  .member-section-head {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .member-h2 {
+    font-size: 17px !important;
+  }
+
+  .member-toast-header {
+    padding: 1rem !important;
+  }
+
+  .member-code-chip {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+}
