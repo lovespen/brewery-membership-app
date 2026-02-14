@@ -166,10 +166,11 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
     (function() {
       var memberId = ${JSON.stringify(memberId)};
       var root = document.getElementById("root");
+      var apiBase = window.location.origin;
 
       function render(err, data) {
         if (err) {
-          root.innerHTML = "<p class=\"error\">" + (err.message || "Something went wrong.") + "</p>";
+          root.innerHTML = "<p class=\"error\">" + escapeHtml(err.message || "Something went wrong.") + "</p>";
           return;
         }
         if (!data) {
@@ -184,9 +185,8 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
         } else {
           data.pickups.forEach(function(p) {
             var isReady = p.status === "READY_FOR_PICKUP";
-            var badge = isReady ? "<span class=\"badge ready\">Ready</span>" : "<span class=\"badge done\">Picked up</span>";
             var when = p.pickedUpAt ? " – " + new Date(p.pickedUpAt).toLocaleString() : "";
-            html += "<div class=\"card\"><div class=\"row\"><div><strong>" + escapeHtml(p.productName) + "</strong> × " + p.quantity + "<br><span class=\"badge " + (isReady ? "ready" : "done") + "\">" + (isReady ? "Ready for pickup" : "Picked up" + when) + "</span></div>";
+            html += "<div class=\"card\"><div class=\"row\"><div><strong>" + escapeHtml(p.productName || "Item") + "</strong> × " + p.quantity + "<br><span class=\"badge " + (isReady ? "ready" : "done") + "\">" + (isReady ? "Ready for pickup" : "Picked up" + when) + "</span></div>";
             if (isReady) {
               html += "<button class=\"primary\" data-id=\"" + escapeHtml(p.id) + "\">Mark picked up</button>";
             }
@@ -198,7 +198,7 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
           btn.addEventListener("click", function() {
             var id = btn.getAttribute("data-id");
             btn.disabled = true;
-            fetch("/api/pickups/" + id, {
+            fetch(apiBase + "/api/pickups/" + encodeURIComponent(id), {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ pickedUp: true })
@@ -224,13 +224,29 @@ export function registerPickupRoutes(router: IRouter, app: Express) {
           render(null, null);
           return;
         }
-        fetch("/api/pickups/by-member/" + encodeURIComponent(memberId))
+        var url = apiBase + "/api/pickups/by-member/" + encodeURIComponent(memberId);
+        var timeout = setTimeout(function() {
+          if (root.innerHTML.indexOf("Loading") !== -1) {
+            root.innerHTML = "<p class=\"error\">Request timed out. Check that you opened this page from the brewery backend URL (same as the QR).</p>";
+          }
+        }, 15000);
+        fetch(url)
           .then(function(r) {
-            if (!r.ok) throw new Error(r.status === 404 ? "Member not found" : "Request failed");
+            clearTimeout(timeout);
+            if (!r.ok) {
+              var msg = r.status === 404 ? "Member not found" : "Request failed (HTTP " + r.status + ")";
+              return r.text().then(function(t) {
+                try { var j = JSON.parse(t); if (j && j.error) msg = j.error; } catch(e) {}
+                throw new Error(msg);
+              });
+            }
             return r.json();
           })
           .then(function(data) { render(null, data); })
-          .catch(function(e) { render(e, null); });
+          .catch(function(e) {
+            clearTimeout(timeout);
+            render(e, null);
+          });
       }
 
       load();

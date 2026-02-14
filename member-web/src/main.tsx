@@ -3,6 +3,18 @@ import ReactDOM from "react-dom/client";
 import "./member-mobile.css";
 import { MemberPreview } from "./pages/WoodMemberPreview";
 
+function shouldRedirectToStaffPickup(): boolean {
+  if (typeof window === "undefined") return false;
+  const pathname = window.location.pathname;
+  if (pathname !== "/staff-pickup" && pathname !== "/staff-pickup/") return false;
+  const env = typeof import.meta !== "undefined" && (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
+  const base = env && String(env).trim() ? String(env).trim().replace(/\/$/, "") : "";
+  if (!base) return false;
+  const url = (/^https?:\/\//i.test(base) ? base : "https://" + base) + "/staff-pickup" + window.location.search;
+  window.location.replace(url);
+  return true;
+}
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
@@ -39,11 +51,13 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <MemberPreview />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+if (!shouldRedirectToStaffPickup()) {
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <MemberPreview />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
 
